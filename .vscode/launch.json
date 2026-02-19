@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-GpsIngestionApplication<gps-plataforma-ingestion>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.ingestion.pe.mscore.GpsIngestionApplication",
+            "projectName": "gps-plataforma-ingestion",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
