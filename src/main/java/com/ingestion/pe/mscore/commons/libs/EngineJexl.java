@@ -23,7 +23,6 @@ public class EngineJexl {
     }
 
     /**
-     * Evalúa una expresión JEXL y garantiza retorno boolean. Regla: - Cualquier
      * error → false - null
      * → false - No boolean → false
      */
@@ -45,7 +44,6 @@ public class EngineJexl {
                 return bool;
             }
 
-            // 🔒 null o cualquier otro tipo → false
             return false;
 
         } catch (RuntimeException e) {
@@ -86,18 +84,15 @@ public class EngineJexl {
         error.put("message", e.getMessage());
         error.put("script", script);
 
-        // Linea y columna exacta
         if (e.getInfo() != null) {
             error.put("line", e.getInfo().getLine());
             error.put("column", e.getInfo().getColumn());
         }
 
-        // causa real interna (número inválido, concatenación, etc)
         if (e.getCause() != null) {
             error.put("rootCause", e.getCause().toString());
         }
 
-        // Buscar variable sospechosa
         String suspect = extractSuspectVariable(script);
         if (suspect != null && attributes.containsKey(suspect)) {
             error.put("suspectVariable", suspect);

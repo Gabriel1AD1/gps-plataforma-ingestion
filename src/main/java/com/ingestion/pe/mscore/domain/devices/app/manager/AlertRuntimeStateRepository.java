@@ -9,6 +9,6 @@ public class AlertRuntimeStateRepository {
     }
 
     public void save(Long deviceId, Long configId, AlertRuntimeState state) {
-        // No-op for stub
+
     }
 }

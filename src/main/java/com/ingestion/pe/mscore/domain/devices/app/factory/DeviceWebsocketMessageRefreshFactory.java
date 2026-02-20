@@ -12,12 +12,6 @@ public final class DeviceWebsocketMessageRefreshFactory {
         private DeviceWebsocketMessageRefreshFactory() {
         }
 
-        /*
-         * =========================
-         * Casos de uso públicos
-         * =========================
-         */
-
         public static WebsocketMessage newDeviceStatus(DeviceEntity device) {
                 return refresh(
                                 "STATUS_DEVICE",
@@ -75,11 +69,7 @@ public final class DeviceWebsocketMessageRefreshFactory {
                                 attributes);
         }
 
-        /*
-         * =========================
-         * Factory base reutilizable
-         * =========================
-         */
+
 
         private static WebsocketMessage refresh(
                         String type,

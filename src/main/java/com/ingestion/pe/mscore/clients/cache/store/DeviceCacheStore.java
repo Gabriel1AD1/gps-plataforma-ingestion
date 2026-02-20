@@ -15,8 +15,6 @@ public class DeviceCacheStore {
 
     private final CacheDao<DeviceResponse> cacheDao;
 
-    /* ================= KEYS ================= */
-
     private String key(Long companyId, Long deviceId) {
         return "device:" + companyId + ":" + deviceId;
     }
@@ -28,8 +26,6 @@ public class DeviceCacheStore {
     private String keyByImei(String imei) {
         return "device:imei:" + imei;
     }
-
-    /* ================= GET ================= */
 
     public Optional<DeviceResponse> get(Long companyId, Long deviceId) {
         return cacheDao.get(key(companyId, deviceId), DeviceResponse.class);
@@ -43,8 +39,6 @@ public class DeviceCacheStore {
         return cacheDao.get(keyByImei(imei), DeviceResponse.class);
     }
 
-    /* ================= SAVE ================= */
-
     public void save(DeviceEntity entity) {
         DeviceResponse response = toResponse(entity);
 
@@ -53,15 +47,11 @@ public class DeviceCacheStore {
         cacheDao.save(keyByImei(entity.getImei()), response, TTL_SECONDS);
     }
 
-    /* ================= DELETE ================= */
-
     public void delete(DeviceEntity entity) {
         cacheDao.delete(key(entity.getCompany(), entity.getId()));
         cacheDao.delete(keyById(entity.getId()));
         cacheDao.delete(keyByImei(entity.getImei()));
     }
-
-    /* ================= MAPPER ================= */
 
     private DeviceResponse toResponse(DeviceEntity entity) {
         return new DeviceResponse(
