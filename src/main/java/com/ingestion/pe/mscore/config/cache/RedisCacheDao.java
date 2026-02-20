@@ -1,12 +1,11 @@
 package com.ingestion.pe.mscore.config.cache;
 
 import com.ingestion.pe.mscore.commons.libs.utils.JsonUtils;
+import java.time.Duration;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Repository;
-
-import java.time.Duration;
-import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
@@ -26,12 +25,10 @@ public class RedisCacheDao<T> implements CacheDao<T> {
             return Optional.empty();
         }
 
-        // ✔ ya es del tipo correcto
         if (type.isInstance(value)) {
             return Optional.of(type.cast(value));
         }
 
-        // ✔ convertir LinkedHashMap → DTO usando tu JsonUtils
         try {
             T converted = JsonUtils.deserializerMapper.convertValue(value, type);
             return Optional.of(converted);

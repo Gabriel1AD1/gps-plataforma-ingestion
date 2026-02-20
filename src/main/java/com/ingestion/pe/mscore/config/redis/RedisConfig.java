@@ -19,11 +19,10 @@ public class RedisConfig {
         GenericJackson2JsonRedisSerializer jsonSerializer = new GenericJackson2JsonRedisSerializer(
                 JsonUtils.serializerMapper);
 
-        // Use String serializer for keys
+        
         template.setKeySerializer(new StringRedisSerializer());
         template.setHashKeySerializer(new StringRedisSerializer());
 
-        // Use JSON serializer for values with shared Mapper configuration
         template.setValueSerializer(jsonSerializer);
         template.setHashValueSerializer(jsonSerializer);
 

@@ -3,7 +3,6 @@ package com.ingestion.pe.mscore.domain.devices.core.repo;
 import com.ingestion.pe.mscore.domain.devices.core.entity.DeviceEntity;
 import com.ingestion.pe.mscore.domain.devices.core.enums.DeviceStatus;
 import java.util.Optional;
-import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;

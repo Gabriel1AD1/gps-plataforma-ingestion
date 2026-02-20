@@ -5,11 +5,11 @@ import static com.ingestion.pe.mscore.domain.devices.app.factory.DeviceWebsocket
 import com.ingestion.pe.mscore.bridge.pub.models.DevicePositionEventCreate;
 import com.ingestion.pe.mscore.bridge.pub.models.ResolvedApplicationEvent;
 import com.ingestion.pe.mscore.bridge.pub.service.EventCreateBridgeService;
+import com.ingestion.pe.mscore.bridge.pub.service.KafkaPublisherService;
 import com.ingestion.pe.mscore.clients.VehicleClient;
 import com.ingestion.pe.mscore.clients.cache.store.DeviceCacheStore;
 import com.ingestion.pe.mscore.clients.models.VehicleResponse;
 import com.ingestion.pe.mscore.commons.models.Position;
-import com.ingestion.pe.mscore.bridge.pub.service.KafkaPublisherService;
 import com.ingestion.pe.mscore.commons.models.WebsocketMessage;
 import com.ingestion.pe.mscore.domain.devices.app.factory.DeviceApplicationEventFactory;
 import com.ingestion.pe.mscore.domain.devices.app.manager.ManagerConfigAlert;
@@ -24,7 +24,6 @@ import com.ingestion.pe.mscore.domain.devices.core.repo.UserDeviceEntityReposito
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -43,10 +42,8 @@ public class DeviceServiceHandler {
         private final ManagerConfigAlert managerConfigAlert;
         private final VehicleClient vehicleClient;
         private final DeviceCacheStore deviceCacheStore;
+        private final com.ingestion.pe.mscore.applications.tracking.TrackingProcessorService trackingProcessorService;
 
-        /*
-         * Manejador de los posiciones de los pocisiones
-         */
         @Transactional
         public void handleDeviceEvent(Position position) {
                 Optional<DeviceEntity> deviceOpt = deviceEntityRepository.findByImei(position.getImei());
@@ -54,9 +51,9 @@ public class DeviceServiceHandler {
                 if (deviceOpt.isPresent()) {
                         DeviceEntity device = deviceOpt.get();
                         try {
-                                log.info("🔍 [DEBUG] Procesando Dispositivo ID: {}, IMEI: {}",
+                                log.info("[DEBUG] Procesando Dispositivo ID: {}, IMEI: {}",
                                                 device.getId(), device.getImei());
-                                log.info("🔍 [DEBUG] Datos ANTES de update: LastData={}, Speed={}, Lat={}, Lon={}",
+                                log.info("[DEBUG] Datos ANTES de update: LastData={}, Speed={}, Lat={}, Lon={}",
                                                 device.getLastDataReceived(),
                                                 device.getSpeedInKmh(), device.getLatitude(),
                                                 device.getLongitude());
@@ -87,11 +84,13 @@ public class DeviceServiceHandler {
                                 Map<String, Object> attributes = device.getSensorOnTime();
 
                                 deviceEntityRepository.save(device);
-                                log.info("✅ [DEBUG] Dispositivo GUARDADO. Datos AHORA: LastData={}, Speed={}, Lat={}, Lon={}",
+                                log.info("[DEBUG] Dispositivo GUARDADO. Datos AHORA: LastData={}, Speed={}, Lat={}, Lon={}",
                                                 device.getLastDataReceived(),
                                                 device.getSpeedInKmh(),
                                                 device.getLatitude(),
                                                 device.getLongitude());
+
+                                trackingProcessorService.processPositionForTracking(position, company);
 
                                 // Se aplican las reglas y vuelve a obtener las alertas
                                 Set<DeviceConfigAlertsEntity> configAlertsEntities = managerConfigAlert
@@ -127,7 +126,7 @@ public class DeviceServiceHandler {
                                 throw e; // Relanzar para manejo superior si es necesario
                         }
                 } else {
-                        log.warn("❌ [DEBUG] No se encontró el dispositivo con IMEI: {}", position.getImei());
+                        log.warn("[DEBUG] No se encontró el dispositivo con IMEI: {}", position.getImei());
                 }
         }
 

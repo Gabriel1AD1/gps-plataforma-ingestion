@@ -4,7 +4,6 @@ import com.ingestion.pe.mscore.commons.libs.utils.JsonUtils;
 import com.ingestion.pe.mscore.domain.devices.core.models.ConfigAlertNotificationInternal;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
-
 import java.util.Set;
 
 @Converter

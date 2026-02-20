@@ -3,13 +3,12 @@ package com.ingestion.pe.mscore.config.kafka.sub;
 import com.ingestion.pe.mscore.config.log.LogManager;
 import com.ingestion.pe.mscore.domain.devices.app.handlers.StatusDeviceServiceHandler;
 import com.ingestion.pe.mscore.domain.devices.app.handlers.models.StatusDevice;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-
-import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor

@@ -1,9 +1,9 @@
 package com.ingestion.pe.mscore.domain.devices.core.entity;
 
-import com.ingestion.pe.mscore.commons.converter.MapConverter;
-import com.ingestion.pe.mscore.commons.models.Position;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.ingestion.pe.mscore.commons.converter.MapConverter;
+import com.ingestion.pe.mscore.commons.models.Position;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.LinkedHashMap;

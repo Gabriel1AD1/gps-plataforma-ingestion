@@ -3,11 +3,10 @@ package com.ingestion.pe.mscore.domain.devices.app.handlers;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.ingestion.pe.mscore.applications.tracking.TrackingProcessorService;
 import com.ingestion.pe.mscore.bridge.pub.models.DevicePositionEventCreate;
 import com.ingestion.pe.mscore.bridge.pub.service.EventCreateBridgeService;
 import com.ingestion.pe.mscore.bridge.pub.service.KafkaPublisherService;
@@ -24,7 +23,6 @@ import com.ingestion.pe.mscore.domain.devices.core.repo.HistoricalDeviceEntityRe
 import com.ingestion.pe.mscore.domain.devices.core.repo.UserDeviceEntityRepository;
 import java.util.Collections;
 import java.util.Optional;
-import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -53,6 +51,8 @@ class DeviceServiceHandlerTest {
     private VehicleClient vehicleClient;
     @Mock
     private DeviceCacheStore deviceCacheStore;
+    @Mock
+    private TrackingProcessorService trackingProcessorService;
 
     @InjectMocks
     private DeviceServiceHandler deviceServiceHandler;

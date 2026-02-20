@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.ingestion.pe.mscore.domain.devices.app.handlers.DeviceServiceHandlerTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-02-19T12:29:32.936Z" hostname="FER" time="1.856">
+<testsuite name="com.ingestion.pe.mscore.domain.devices.app.handlers.DeviceServiceHandlerTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-02-20T12:38:31.444Z" hostname="FER" time="1.25">
   <properties/>
-  <testcase name="handleDeviceEvent_ShouldProcessAndPublish()" classname="com.ingestion.pe.mscore.domain.devices.app.handlers.DeviceServiceHandlerTest" time="1.856"/>
-  <system-out><![CDATA[07:29:34.706 [Test worker] INFO com.ingestion.pe.mscore.domain.devices.app.handlers.DeviceServiceHandler -- ]]>&#x1f50d;<![CDATA[ [DEBUG] Procesando Dispositivo ID: 1, IMEI: 123456789012345
-07:29:34.713 [Test worker] INFO com.ingestion.pe.mscore.domain.devices.app.handlers.DeviceServiceHandler -- ]]>&#x1f50d;<![CDATA[ [DEBUG] Datos ANTES de update: LastData=null, Speed=null, Lat=null, Lon=null
-07:29:34.726 [Test worker] INFO com.ingestion.pe.mscore.domain.devices.app.handlers.DeviceServiceHandler -- ✅ [DEBUG] Dispositivo GUARDADO. Datos AHORA: LastData=2026-02-19T12:29:34.722729600Z, Speed=0.0, Lat=10.0, Lon=20.0
+  <testcase name="handleDeviceEvent_ShouldProcessAndPublish()" classname="com.ingestion.pe.mscore.domain.devices.app.handlers.DeviceServiceHandlerTest" time="1.25"/>
+  <system-out><![CDATA[07:38:32.653 [Test worker] INFO com.ingestion.pe.mscore.domain.devices.app.handlers.DeviceServiceHandler -- ]]>&#x1f50d;<![CDATA[ [DEBUG] Procesando Dispositivo ID: 1, IMEI: 123456789012345
+07:38:32.656 [Test worker] INFO com.ingestion.pe.mscore.domain.devices.app.handlers.DeviceServiceHandler -- ]]>&#x1f50d;<![CDATA[ [DEBUG] Datos ANTES de update: LastData=null, Speed=null, Lat=null, Lon=null
+07:38:32.661 [Test worker] INFO com.ingestion.pe.mscore.domain.devices.app.handlers.DeviceServiceHandler -- ✅ [DEBUG] Dispositivo GUARDADO. Datos AHORA: LastData=2026-02-20T12:38:32.659590100Z, Speed=0.0, Lat=10.0, Lon=20.0
 ]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

@@ -1,7 +1,7 @@
 package com.ingestion.pe.mscore.commons.models;
 
-import com.ingestion.pe.mscore.commons.libs.utils.JsonUtils;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.ingestion.pe.mscore.commons.libs.utils.JsonUtils;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;

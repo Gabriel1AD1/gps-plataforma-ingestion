@@ -1,8 +1,8 @@
 package com.ingestion.pe.mscore.config.kafka.sub;
 
+import com.ingestion.pe.mscore.commons.models.Position;
 import com.ingestion.pe.mscore.config.log.LogManager;
 import com.ingestion.pe.mscore.domain.devices.app.handlers.DeviceServiceHandler;
-import com.ingestion.pe.mscore.commons.models.Position;
 import com.ingestion.pe.mscore.domain.vehicles.app.service.VehicleTrackingFacadeService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;

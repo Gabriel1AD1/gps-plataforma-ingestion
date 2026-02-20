@@ -13,9 +13,7 @@ public class VehicleTrackingFacadeServiceImpl implements VehicleTrackingFacadeSe
 
     @Override
     public void processPositionForTracking(Position position) {
-        // TODO: Implement vehicle tracking logic or migrate necessary services
-        // For now, this is a placeholder to allow compilation and basic position
-        // processing
+
         log.info("Processing position for tracking: {}", position.getImei());
     }
 }

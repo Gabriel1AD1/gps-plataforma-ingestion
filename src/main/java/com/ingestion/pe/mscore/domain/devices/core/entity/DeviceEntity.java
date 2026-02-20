@@ -1,5 +1,6 @@
 package com.ingestion.pe.mscore.domain.devices.core.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.ingestion.pe.mscore.commons.converter.JsonbListMapConverter;
 import com.ingestion.pe.mscore.commons.converter.MapConverter;
 import com.ingestion.pe.mscore.commons.models.Position;
@@ -10,12 +11,10 @@ import com.ingestion.pe.mscore.domain.devices.core.converter.SensorModelConverte
 import com.ingestion.pe.mscore.domain.devices.core.enums.DeviceStatus;
 import com.ingestion.pe.mscore.domain.devices.core.enums.DeviceType;
 import com.ingestion.pe.mscore.domain.devices.core.models.SensorModel;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.*;
-
 import lombok.*;
 import org.hibernate.annotations.*;
 import org.slf4j.Logger;

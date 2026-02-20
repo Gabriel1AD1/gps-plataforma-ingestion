@@ -3,9 +3,8 @@ package com.ingestion.pe.mscore.domain.devices.core.models;
 import com.ingestion.pe.mscore.commons.models.enums.TimeZone;
 import com.ingestion.pe.mscore.domain.auth.core.enums.NotificationTypes;
 import jakarta.validation.constraints.NotNull;
-import lombok.*;
-
 import java.util.Set;
+import lombok.*;
 
 /** Esta clase se usa para notificar los uisuarios que no estan en el sistema */
 @Data
