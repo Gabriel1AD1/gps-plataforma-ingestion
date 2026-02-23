@@ -9,6 +9,7 @@ import com.ingestion.pe.mscore.bridge.pub.service.KafkaPublisherService;
 import com.ingestion.pe.mscore.clients.VehicleClient;
 import com.ingestion.pe.mscore.clients.cache.store.DeviceCacheStore;
 import com.ingestion.pe.mscore.clients.models.VehicleResponse;
+import com.ingestion.pe.mscore.config.cache.store.RedisPositionStore;
 import com.ingestion.pe.mscore.commons.models.Position;
 import com.ingestion.pe.mscore.commons.models.WebsocketMessage;
 import com.ingestion.pe.mscore.domain.devices.app.factory.DeviceApplicationEventFactory;
@@ -43,6 +44,7 @@ public class DeviceServiceHandler {
         private final VehicleClient vehicleClient;
         private final DeviceCacheStore deviceCacheStore;
         private final com.ingestion.pe.mscore.applications.tracking.TrackingProcessorService trackingProcessorService;
+        private final RedisPositionStore redisPositionStore;
 
         @Transactional
         public void handleDeviceEvent(Position position) {
@@ -92,16 +94,14 @@ public class DeviceServiceHandler {
 
                                 trackingProcessorService.processPositionForTracking(position, company);
 
-                                // Se aplican las reglas y vuelve a obtener las alertas
+                                redisPositionStore.savePosition(position, company);
+
                                 Set<DeviceConfigAlertsEntity> configAlertsEntities = managerConfigAlert
                                                 .executeConfigAlertRules(device.getId(), attributes);
 
-                                // Mutamos las configuraciones de alerta resueltas
                                 markConfigResolved(configAlertsEntities, attributes);
-                                // Mutamos las configuraciones de alerta no resueltas
                                 markConfigNotResolved(device, configAlertsEntities, usersNotSendPositions, company);
 
-                                // Se guardan los cambios en las alertas
                                 deviceConfigAlertsEntityRepository.saveAll(configAlertsEntities);
 
                                 sendNewPosition(device, historicalSave, company);
@@ -113,6 +113,9 @@ public class DeviceServiceHandler {
                                 eventCreateBridgeService.createEvent(
                                                 DevicePositionEventCreate.builder()
                                                                 .deviceId(device.getId())
+                                                                .deviceTime(position.getDeviceTime() != null
+                                                                                ? position.getDeviceTime().toInstant()
+                                                                                : Instant.now())
                                                                 .imei(device.getImei())
                                                                 .sensors(device.getSensor())
                                                                 .sensorData(sensorData)
@@ -123,7 +126,7 @@ public class DeviceServiceHandler {
 
                         } catch (Exception e) {
                                 log.error("Error procesando evento de dispositivo: {}", e.getMessage(), e);
-                                throw e; // Relanzar para manejo superior si es necesario
+                                throw e;
                         }
                 } else {
                         log.warn("[DEBUG] No se encontró el dispositivo con IMEI: {}", position.getImei());
@@ -158,7 +161,11 @@ public class DeviceServiceHandler {
                                                         eventCreateBridgeService.createEvent(
                                                                         ResolvedApplicationEvent.builder()
                                                                                         .eventId(deactivatedAlert
-                                                                                                        .getEventId())
+                                                                                                        .getEventId() != null
+                                                                                                                        ? deactivatedAlert
+                                                                                                                                        .getEventId()
+                                                                                                                                        .toString()
+                                                                                                                        : null)
                                                                                         .resolutionNotes(
                                                                                                         resolutionNotes)
                                                                                         .resolution(true)

@@ -15,16 +15,16 @@ public class KafkaPublisherService {
 
     private final KafkaTemplate<String, String> kafkaTemplate;
 
-    @Value("${kafka.topic.websocket-push:websocket.push}")
+    @Value("${kafka.topic.websocket}")
     private String websocketTopic;
 
     public void publishWebsocketMessage(WebsocketMessage message) {
         try {
             String payload = JsonUtils.toJson(message);
             kafkaTemplate.send(websocketTopic, payload);
-            log.debug("Published websocket message to topic {}: {}", websocketTopic, payload);
+            log.debug("Mensaje websocket publicado a topic {}: {}", websocketTopic, payload);
         } catch (Exception e) {
-            log.error("Error publishing websocket message: {}", e.getMessage(), e);
+            log.error("Error publicando mensaje websocket: {}", e.getMessage(), e);
         }
     }
 }
