@@ -1,3 +1,0 @@
-Æ07:38:32.653 [Test worker] INFO com.ingestion.pe.mscore.domain.devices.app.handlers.DeviceServiceHandler -- üîç [DEBUG] Procesando Dispositivo ID: 1, IMEI: 123456789012345
-ø07:38:32.656 [Test worker] INFO com.ingestion.pe.mscore.domain.devices.app.handlers.DeviceServiceHandler -- üîç [DEBUG] Datos ANTES de update: LastData=null, Speed=null, Lat=null, Lon=null
-„07:38:32.661 [Test worker] INFO com.ingestion.pe.mscore.domain.devices.app.handlers.DeviceServiceHandler -- ‚úÖ [DEBUG] Dispositivo GUARDADO. Datos AHORA: LastData=2026-02-20T12:38:32.659590100Z, Speed=0.0, Lat=10.0, Lon=20.0

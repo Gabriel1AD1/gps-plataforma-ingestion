@@ -17,7 +17,7 @@ public class DeviceResponse {
     private String serialNumber;
     private String password;
     private String model;
-    private Long company;
+    private Long companyId;
     private Map<String, Object> sensor;
     private Map<String, Object> sensorRaw;
     private List<Map<String, Object>> dataHistory;
@@ -25,5 +25,5 @@ public class DeviceResponse {
     private Double longitude;
     private Double altitude;
     private Double speedInKmh;
-    private List<Map<String, Object>> sensorDataMap;
+    private List<Map<String, Object>> sensorData;
 }

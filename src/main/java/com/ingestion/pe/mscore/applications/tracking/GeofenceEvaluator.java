@@ -22,7 +22,7 @@ public class GeofenceEvaluator {
         return switch (geofence.getType()) {
             case "CIRCLE" -> isInsideCircle(geofence, latitude, longitude);
             case "POLYGON" -> isInsidePolygon(geofence.getPoints(), latitude, longitude);
-            default -> throw new IllegalStateException("Unexpected geofence type: " + geofence.getType());
+            default -> throw new IllegalStateException("Geocercas con tipo inesperado: " + geofence.getType());
         };
     }
 
