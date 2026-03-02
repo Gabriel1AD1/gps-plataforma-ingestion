@@ -252,6 +252,7 @@ public class DeviceEntity {
         var sensorsLast = new HashMap<>(this.sensorOnTime);
 
         this.sensor = cleanSensor(sensorsLast);
+
         /*
          * Optional.ofNullable(this.overrideSensors)
          * .ifPresent(

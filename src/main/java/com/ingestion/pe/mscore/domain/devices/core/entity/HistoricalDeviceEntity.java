@@ -130,11 +130,6 @@ public class HistoricalDeviceEntity {
             return fieldName;
         }
 
-        /**
-         * Resuelve un campo de ordenamiento desde texto externo (query param). Si no
-         * existe, retorna
-         * SERVER_TIME por defecto.
-         */
         public static SortField from(String value) {
             if (value == null) {
                 return SERVER_TIME;

@@ -34,7 +34,7 @@ public class RedisCacheDao<T> implements CacheDao<T> {
             return Optional.of(converted);
         } catch (IllegalArgumentException e) {
             throw new RuntimeException(
-                    "Error converting Redis value for key=" + key + " to " + type.getSimpleName(),
+                    "Error convirtiendo el valor de Redis para la clave=" + key + " a " + type.getSimpleName(),
                     e);
         }
     }

@@ -32,7 +32,7 @@ public class TrackingProcessorService {
 
     public void processPositionForTracking(Position position, Long companyId) {
         if (position == null || companyId == null || companyId == 0L) {
-            log.warn("Cannot process tracking: invalid position or missing companyId");
+            log.warn("No se puede procesar la posición: posición inválida o companyId faltante");
             return;
         }
 
@@ -45,7 +45,7 @@ public class TrackingProcessorService {
             Object idsObj = redisTemplate.opsForValue().get(companyGeofencesKey);
 
             if (idsObj == null) {
-                log.debug("No active geofences found for companyId={}", companyId);
+                log.debug("No se encontraron geocercas activas para companyId={}", companyId);
                 return;
             }
 
@@ -56,7 +56,7 @@ public class TrackingProcessorService {
                         .map(obj -> Long.parseLong(obj.toString()))
                         .collect(Collectors.toList());
             } else {
-                log.warn("Unexpected type for company geofences in Redis: {}", idsObj.getClass());
+                log.warn("Tipo inesperado para geocercas de la empresa en Redis: {}", idsObj.getClass());
                 return;
             }
 
@@ -64,7 +64,7 @@ public class TrackingProcessorService {
                 return;
             }
 
-            log.debug("Checking {} geofences for IMEI={}", geofenceIds.size(), position.getImei());
+            log.debug("Revisando {} geocercas para IMEI={}", geofenceIds.size(), position.getImei());
 
             for (Long geofenceId : geofenceIds) {
                 String geofenceKey = "geofence:" + companyId + ":" + geofenceId;
@@ -74,7 +74,7 @@ public class TrackingProcessorService {
             }
 
         } catch (Exception e) {
-            log.error("Error computing tracking metrics for position: {}", e.getMessage(), e);
+            log.error("Error al calcular métricas de seguimiento para la posición: {}", e.getMessage(), e);
         }
     }
 
@@ -89,7 +89,7 @@ public class TrackingProcessorService {
         geofenceStatusCacheStore.save(companyId, position.getImei(), geofence.getId(), currentStatus);
 
         if (previousStatusOpt.isEmpty() || previousStatusOpt.get() == GeofenceStatus.UNKNOWN) {
-            log.debug("First detection: IMEI={}, geofence={}, status={}", position.getImei(), geofence.getName(),
+            log.debug("Primera detección: IMEI={}, geofence={}, status={}", position.getImei(), geofence.getName(),
                     currentStatus);
             return;
         }
@@ -110,7 +110,7 @@ public class TrackingProcessorService {
 
     private void publishEvent(Position position, GeofenceResponse geofence, Long companyId,
             GeofenceEventType eventType) {
-        log.info("{} detected: IMEI={}, geofence={}", eventType, position.getImei(), geofence.getName());
+        log.info("{} detectada: IMEI={}, geofence={}", eventType, position.getImei(), geofence.getName());
 
         GeofenceEventDto eventDto = GeofenceEventDto.builder()
                 .imei(position.getImei())
