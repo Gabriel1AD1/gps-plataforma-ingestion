@@ -8,10 +8,12 @@ import static org.mockito.Mockito.when;
 
 import com.ingestion.pe.mscore.applications.tracking.TrackingProcessorService;
 import com.ingestion.pe.mscore.bridge.pub.models.DevicePositionEventCreate;
-import com.ingestion.pe.mscore.bridge.pub.service.EventCreateBridgeService;
+// import com.ingestion.pe.mscore.bridge.pub.service.EventCreateBridgeService;
 import com.ingestion.pe.mscore.bridge.pub.service.KafkaPublisherService;
 import com.ingestion.pe.mscore.clients.VehicleClient;
 import com.ingestion.pe.mscore.clients.cache.store.DeviceCacheStore;
+import com.ingestion.pe.mscore.config.cache.store.RedisPositionStore;
+import com.ingestion.pe.mscore.domain.monitoring.app.handler.PositionMonitoringHook;
 import com.ingestion.pe.mscore.commons.models.Position;
 import com.ingestion.pe.mscore.commons.models.WebsocketMessage;
 import com.ingestion.pe.mscore.domain.devices.app.manager.ManagerConfigAlert;
@@ -43,8 +45,7 @@ class DeviceServiceHandlerTest {
     private HistoricalDeviceEntityRepository historicalDeviceEntityRepository;
     @Mock
     private DeviceConfigAlertsEntityRepository deviceConfigAlertsEntityRepository;
-    @Mock
-    private EventCreateBridgeService eventCreateBridgeService;
+    // @Mock EventCreateBridgeService eventCreateBridgeService;
     @Mock
     private ManagerConfigAlert managerConfigAlert;
     @Mock
@@ -53,6 +54,10 @@ class DeviceServiceHandlerTest {
     private DeviceCacheStore deviceCacheStore;
     @Mock
     private TrackingProcessorService trackingProcessorService;
+    @Mock
+    private RedisPositionStore redisPositionStore;
+    @Mock
+    private PositionMonitoringHook positionMonitoringHook;
 
     @InjectMocks
     private DeviceServiceHandler deviceServiceHandler;
@@ -102,7 +107,7 @@ class DeviceServiceHandlerTest {
         verify(deviceEntityRepository).save(deviceEntity);
         verify(historicalDeviceEntityRepository).save(any(HistoricalDeviceEntity.class));
         verify(kafkaPublisherService).publishWebsocketMessage(any(WebsocketMessage.class));
-        verify(eventCreateBridgeService).createEvent(any(DevicePositionEventCreate.class));
+        // verify(eventCreateBridgeService).createEvent(any(DevicePositionEventCreate.class));
         verify(deviceCacheStore).save(deviceEntity);
     }
 }

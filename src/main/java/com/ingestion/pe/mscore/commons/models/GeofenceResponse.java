@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 public class GeofenceResponse implements Serializable {
     private Long id;
     private Long companyId;
+    private Long vehicleId;
     private String name;
     private String description;
     private Double latitudeCenter;

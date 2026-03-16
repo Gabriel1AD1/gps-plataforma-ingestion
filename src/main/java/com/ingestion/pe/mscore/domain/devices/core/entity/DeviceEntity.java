@@ -8,6 +8,7 @@ import com.ingestion.pe.mscore.commons.models.enums.EntityStatus;
 import com.ingestion.pe.mscore.domain.devices.core.converter.DeviceStatusConverter;
 import com.ingestion.pe.mscore.domain.devices.core.converter.DeviceTypeConverter;
 import com.ingestion.pe.mscore.domain.devices.core.converter.SensorModelConverter;
+import com.ingestion.pe.mscore.domain.devices.core.entity.OverrideSensorsEntity;
 import com.ingestion.pe.mscore.domain.devices.core.enums.DeviceStatus;
 import com.ingestion.pe.mscore.domain.devices.core.enums.DeviceType;
 import com.ingestion.pe.mscore.domain.devices.core.models.SensorModel;
@@ -173,6 +174,9 @@ public class DeviceEntity {
      * )
      * private OverrideSensorsEntity overrideSensors;
      */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "override_sensors_id")
+    private OverrideSensorsEntity overrideSensors;
     @Column(name = "last_historical_device_id")
     @Comment("Último registro histórico asociado al dispositivo")
     private Long lastHistoricalDevice;
@@ -249,28 +253,16 @@ public class DeviceEntity {
         log.debug("Sensor raw actualizado: {}", this.sensorRaw);
         // Aplicar la sobreescritura de sensores si existe una configuración
         log.debug("Sensor data recibido de bd antes de sobreescritura: {}", sensorsData);
-        var sensorsLast = new HashMap<>(this.sensorOnTime);
-
-        this.sensor = cleanSensor(sensorsLast);
-
-        /*
-         * Optional.ofNullable(this.overrideSensors)
-         * .ifPresent(
-         * override -> {
-         * log.debug("Aplicando sensores data {}", sensorsData);
-         * // newData (sensorRaw) es la fuente de verdad
-         * log.debug("Sensores combinados para sobreescritura: {}", sensorsLast);
-         * 
-         * // Ejecutar el script JEXL para obtener los sensores sobreescritos
-         * // Actualizar el mapa de sensores con los valores sobreescritos
-         * // No incluir los tiempos en el sensor con tiempo
-         * Map<String, Object> executeSensor = override.executeJexlScript(sensorsLast);
-         * Map<String, Object> cleanSensor = cleanSensor(executeSensor);
-         * this.sensor = cleanSensor;
-         * updateSensorData(cleanSensor);
-         * this.sensorOnTime = getSensorOnTime(this.sensorsData);
-         * });
-         */
+        Optional.ofNullable(this.overrideSensors)
+                .ifPresent(
+                        override -> {
+                            var sensorsLast = new HashMap<>(this.sensorOnTime);
+                            Map<String, Object> executeSensor = override.executeJexlScript(sensorsLast);
+                            Map<String, Object> mapCleanSensor = cleanSensor(executeSensor);
+                            this.sensor = mapCleanSensor;
+                            updateSensorData(mapCleanSensor);
+                            this.sensorOnTime = getSensorOnTime(this.sensorsData);
+                        });
 
         if (this.dataHistory.size() >= 50) {
             // elimina el primero (el más antiguo)
