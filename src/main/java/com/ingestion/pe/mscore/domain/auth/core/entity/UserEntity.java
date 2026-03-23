@@ -16,6 +16,10 @@ public class UserEntity {
   @Column(nullable = false)
   private Long id;
 
+  @Column(name = "uuid", insertable = false, updatable = false)
+  private java.util.UUID uuid;
+
+
   @Column(name = "email", insertable = false, updatable = false)
   private String email;
 

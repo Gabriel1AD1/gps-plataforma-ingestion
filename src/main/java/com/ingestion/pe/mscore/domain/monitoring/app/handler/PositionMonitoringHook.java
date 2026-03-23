@@ -126,6 +126,7 @@ public class PositionMonitoringHook {
                 .tripId(trip.getId())
                 .routeId(trip.getRouteId())
                 .vehicleId(trip.getVehicleId())
+                .driverId(trip.getDriverId())
                 .direction(trip.getDirection())
                 .currentPointIndex(0)
                 .accumulatedDistanceKm(0.0)

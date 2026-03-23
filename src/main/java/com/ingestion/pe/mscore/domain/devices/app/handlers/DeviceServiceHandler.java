@@ -44,6 +44,7 @@ public class DeviceServiceHandler {
         private final com.ingestion.pe.mscore.applications.tracking.TrackingProcessorService trackingProcessorService;
         private final RedisPositionStore redisPositionStore;
         private final PositionMonitoringAsyncDispatcher positionMonitoringAsyncDispatcher;
+        private final com.ingestion.pe.mscore.domain.atu.app.dispatcher.AtuTransmissionAsyncDispatcher atuTransmissionAsyncDispatcher;
         private final EventEntityRepository eventEntityRepository;
         private final EventResolver eventResolver;
 
@@ -128,6 +129,8 @@ public class DeviceServiceHandler {
                                                 position.getDeviceTime() != null
                                                                 ? position.getDeviceTime().toInstant()
                                                                 : Instant.now());
+
+                                atuTransmissionAsyncDispatcher.dispatchAsync(position, device.getId(), company);
 
                         } catch (Exception e) {
                                 log.error("Error procesando evento de dispositivo: {}", e.getMessage(), e);

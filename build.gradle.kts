@@ -39,18 +39,14 @@ dependencies {
     annotationProcessor("org.projectlombok:lombok:1.18.26")
     compileOnly("org.projectlombok:lombok:1.18.26")
     
-    // Security
-    implementation("org.springframework.boot:spring-boot-starter-security")
-    implementation("org.springframework.security:spring-security-core")
-    implementation("org.springframework.security:spring-security-web")
-    implementation("org.springframework.security:spring-security-config")
-    implementation("com.auth0:java-jwt:4.4.0")
+    // OpenAPI
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.1.0")
     
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     
     // Web starter needed for eventual health checks or simple controller if needed
     implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-websocket")
     
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("org.apache.commons:commons-jexl3:3.3")
@@ -58,7 +54,6 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.springframework.security:spring-security-test")
     testImplementation("org.awaitility:awaitility:4.2.0")
     testImplementation("org.assertj:assertj-core:3.24.2")
     

@@ -42,6 +42,8 @@ public class TrackingProcessorService {
     private final EventEntityRepository eventEntityRepository;
     private final EventResolver eventResolver;
     private final GeofenceReadEntityRepository geofenceReadEntityRepository;
+    private final com.ingestion.pe.mscore.domain.devices.core.repo.UserDeviceEntityRepository userDeviceEntityRepository;
+
 
     private static final long GEOFENCE_CACHE_TTL_SECONDS = 600;
 
@@ -197,8 +199,10 @@ public class TrackingProcessorService {
         if (geofenceConfig == null) {
             log.debug("Sin configuracion de notificación activa para geofenceId={}", geofence.getId());
         }
+        
+        java.util.Set<java.util.UUID> excludedUsers = userDeviceEntityRepository.findExcludedUuidsByDeviceImei(position.getImei());
 
-        ApplicationEventCreate appEvent = GeofenceApplicationEventFactory.forGeofenceEvent(eventDto, geofenceConfig);
+        ApplicationEventCreate appEvent = GeofenceApplicationEventFactory.forGeofenceEvent(eventDto, geofenceConfig, excludedUsers);
         try {
             EventEntity eventEntity = EventEntity.map(appEvent);
             eventEntity = eventEntityRepository.save(eventEntity);

@@ -50,6 +50,7 @@ public class LinearViewCalculator {
                 LinearViewResult result = LinearViewResult.builder()
                         .tripId(state.getTripId())
                         .vehicleId(state.getVehicleId())
+                        .driverId(state.getDriverId())
                         .progressPercent(progress)
                         .status(state.getStatus())
                         .direction(state.getDirection())

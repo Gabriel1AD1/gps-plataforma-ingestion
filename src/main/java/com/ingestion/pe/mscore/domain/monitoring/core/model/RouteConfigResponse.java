@@ -19,4 +19,5 @@ public class RouteConfigResponse implements Serializable {
     private List<ControlPointModel> controlPoints;
     private List<TimeMatrixModel> timeMatrix;
     private List<TimeSpanModel> timeSpans;
+    private String atuRouteCode;
 }

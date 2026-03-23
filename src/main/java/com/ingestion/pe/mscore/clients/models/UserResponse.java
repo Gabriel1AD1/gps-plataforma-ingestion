@@ -13,6 +13,7 @@ import java.util.Set;
 @NoArgsConstructor
 public class UserResponse {
   private Long id;
+  private java.util.UUID uuid;
   private String email;
   private Set<String> emails;
   private Set<String> phones;

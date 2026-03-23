@@ -67,6 +67,7 @@ public class UserCache {
   private UserResponse toResponse(UserEntity entity) {
     return UserResponse.builder()
       .id(entity.getId())
+      .uuid(entity.getUuid())
       .email(entity.getEmail())
       .timeZone(entity.getTimeZone())
       .pushTokens(Set.of())

@@ -31,8 +31,16 @@ public class EventResolver {
 
     List<UserResponse> users = userCache.getUsersByIds(internals);
 
+    java.util.Set<String> excludeIds = eventEntity.getUserExcludeIds() != null
+        ? eventEntity.getUserExcludeIds()
+        : java.util.Collections.emptySet();
+
+    List<UserResponse> filteredUsers = users.stream()
+        .filter(user -> user.getUuid() == null || !excludeIds.contains(user.getUuid().toString()))
+        .toList();
+
     Set<NotificationData.NotificationInternal> notificationInternals =
-        users.stream()
+        filteredUsers.stream()
             .map(
                 user ->
                     NotificationData.NotificationInternal.builder()

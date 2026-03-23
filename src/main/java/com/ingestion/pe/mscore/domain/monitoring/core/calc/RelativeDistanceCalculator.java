@@ -52,6 +52,7 @@ public class RelativeDistanceCalculator {
             DateroResult.DateroResultBuilder builder = DateroResult.builder()
                     .tripId(current.getTripId())
                     .vehicleId(current.getVehicleId())
+                    .driverId(current.getDriverId())
                     .rank(i + 1)
                     .currentPointIndex(current.getCurrentPointIndex())
                     .currentControlPointName(cpName);

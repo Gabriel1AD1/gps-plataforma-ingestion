@@ -154,7 +154,7 @@ public class EventEntity {
             .map(
                 ne ->
                     EventNotificationExternal.builder()
-                        .notificationType(NotificationTypes.valueOf(ne.getNotificationType().name()))
+                        .notificationType(ne.getNotificationType())
                         .destinations(ne.getDestination())
                         .build())
             .collect(Collectors.toSet());
@@ -164,9 +164,7 @@ public class EventEntity {
                 ni ->
                     EventNotificationInternal.builder()
                         .userId(ni.getUserId())
-                        .notificationTypes(ni.getNotificationTypes().stream()
-                                .map(nt -> NotificationTypes.valueOf(nt.name()))
-                                .collect(Collectors.toSet()))
+                        .notificationTypes(ni.getNotificationTypes())
                         .build())
             .collect(Collectors.toSet());
 

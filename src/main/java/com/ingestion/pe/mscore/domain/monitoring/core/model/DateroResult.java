@@ -13,6 +13,7 @@ import lombok.NoArgsConstructor;
 public class DateroResult implements Serializable {
     private Long tripId;
     private Long vehicleId;
+    private Long driverId;
 
     private Long aheadVehicleId;
     private Double aheadDeltaKm;

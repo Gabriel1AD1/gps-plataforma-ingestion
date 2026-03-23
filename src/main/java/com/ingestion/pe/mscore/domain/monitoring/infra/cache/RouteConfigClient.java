@@ -51,6 +51,12 @@ public class RouteConfigClient {
                 .map(VehicleResponse::getId);
     }
 
+    public Optional<String> getVehiclePlate(Long vehicleId) {
+        return vehicleCacheDao
+                .get("vehicle:" + vehicleId, VehicleResponse.class)
+                .map(VehicleResponse::getLicensePlate);
+    }
+
     public List<Long> getKnownRouteIds() {
         return tripIdsCacheDao
                 .get("route:active:ids", Long[].class)

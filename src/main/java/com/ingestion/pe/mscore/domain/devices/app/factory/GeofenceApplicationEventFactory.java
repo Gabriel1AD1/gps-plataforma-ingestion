@@ -7,7 +7,7 @@ import com.ingestion.pe.mscore.bridge.pub.models.enums.ApplicationName;
 import com.ingestion.pe.mscore.bridge.pub.models.enums.ModuleName;
 import com.ingestion.pe.mscore.bridge.pub.models.GeofenceEventDto;
 import com.ingestion.pe.mscore.commons.models.enums.EventTypeEnumerated;
-import com.ingestion.pe.mscore.domain.auth.core.enums.NotificationTypes;
+import com.ingestion.pe.mscore.commons.models.enums.NotificationTypes;
 import com.ingestion.pe.mscore.domain.vehicles.core.entity.VehicleGeofenceEntity;
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,7 +29,8 @@ public class GeofenceApplicationEventFactory {
      */
     public static ApplicationEventCreate forGeofenceEvent(
             GeofenceEventDto eventDto,
-            VehicleGeofenceEntity geofenceConfig) {
+            VehicleGeofenceEntity geofenceConfig,
+            Set<UUID> excludedUsers) {
 
         String eventId = UUID.randomUUID().toString();
         String title = buildTitle(eventDto);
@@ -54,10 +55,13 @@ public class GeofenceApplicationEventFactory {
             log.debug("Sin config de notificación para geofence={}, IMEI={}", eventDto.getGeofenceId(), eventDto.getImei());
         }
 
-        // Determinar el tipo de evento basado en el string del DTO
         EventTypeEnumerated eventType = "ENTRY".equals(eventDto.getEventType())
                 ? EventTypeEnumerated.GEOFENCE_ENTERED
                 : EventTypeEnumerated.GEOFENCE_EXITED;
+                
+        Set<String> excludeIdsStr = excludedUsers != null 
+                ? excludedUsers.stream().map(UUID::toString).collect(Collectors.toSet())
+                : Collections.emptySet();
 
         return ApplicationEventCreate.builder()
                 .eventId(eventId)
@@ -72,6 +76,7 @@ public class GeofenceApplicationEventFactory {
                 .properties(properties)
                 .notificationInternals(notificationInternals)
                 .notificationExternals(notificationExternals)
+                .userExcludeIds(excludeIdsStr)
                 .resolved(false)
                 .resolvedTime(null)
                 .build();
