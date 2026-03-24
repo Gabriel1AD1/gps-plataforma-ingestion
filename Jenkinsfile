@@ -2,10 +2,10 @@ pipeline {
     agent any
 
     environment {
-        PROJECT_NAME       = 'core-service'
+        PROJECT_NAME       = 'ingestion-service'
         BUILD_DIR          = 'build/libs'
-        JAR_PATTERN        = "ms-core.jar"
-        DOCKER_IMAGE       = "ms-core"
+        JAR_PATTERN        = "gps-plataforma-ingestion.jar"
+        DOCKER_IMAGE       = "ms-ingestion"
         NETWORK            = "home-net"
 
         SERVER_USER        = "root"
