@@ -40,7 +40,7 @@ public interface DeviceEntityRepository extends JpaRepository<DeviceEntity, Long
     void updateAllStatuses(@Param("status") DeviceStatus status);
 
     @Query("""
-            SELECT new com.core.pe.mscore.domain.devices.core.dto.response.DevicesStatusSummary(
+            SELECT new com.ingestion.pe.mscore.domain.devices.core.dto.response.DevicesStatusSummary(
               COUNT(d.id),
               d.deviceStatus
             )
