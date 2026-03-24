@@ -1,0 +1,103 @@
+pipeline {
+    agent any
+
+    environment {
+        PROJECT_NAME     = 'core-service-dev'
+        BUILD_DIR        = 'build/libs'
+        JAR_PATTERN      = "ms-core.jar"
+        DOCKER_IMAGE     = "ms-core-dev"
+        NETWORK          = "home-net"
+
+        SERVER_USER      = "root"
+        SERVER_HOST      = "173.249.36.100"
+        SERVER_PORT      = "22"
+        PUERTO_HTTP      = "4355"
+        SSH_CREDENTIAL_ID  = 'yaw-iot'
+        ENV_FILE        = '/home/gps-plataforma-dev/ms-core/.env'
+
+        // 🔥 Límites DEV
+        CONTAINER_MEMORY = "1g"
+        CONTAINER_CPUS   = "1"
+
+        JAVA_OPTS        = "-Xms256m -Xmx768m"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'chmod +x gradlew'
+                sh './gradlew clean build -x test'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    def jarFile = sh(
+                        script: "find ${BUILD_DIR} -name '${JAR_PATTERN}' | head -n 1",
+                        returnStdout: true
+                    ).trim()
+
+                    if (!jarFile) {
+                        error "No se encontró JAR: ${JAR_PATTERN}"
+                    }
+
+                    echo "Construyendo imagen Docker con JAR ${jarFile}..."
+                    sh """
+                        cp ${jarFile} ./app.jar
+                        docker build -t ${DOCKER_IMAGE} .
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to Server') {
+            steps {
+                script {
+                    withCredentials([sshUserPrivateKey(credentialsId: "${SSH_CREDENTIAL_ID}", keyFileVariable: 'SSH_KEY')]) {
+                        sh "ssh-keyscan -p ${SERVER_PORT} ${SERVER_HOST} >> ~/.ssh/known_hosts"
+                        // Guardar imagen en un tar
+                        sh "docker save ${DOCKER_IMAGE} -o ${PROJECT_NAME}.tar"
+
+                        // Copiar imagen al servidor
+                        sh "scp -i $SSH_KEY -P ${SERVER_PORT} ${PROJECT_NAME}.tar ${SERVER_USER}@${SERVER_HOST}:/tmp/"
+
+                        // Ejecutar comandos remotos para cargar y correr el contenedor
+                    sh """
+                    ssh -i $SSH_KEY -p ${SERVER_PORT} ${SERVER_USER}@${SERVER_HOST} '
+                        docker load -i /tmp/${PROJECT_NAME}.tar
+                        docker stop ${PROJECT_NAME} || true
+                        docker rm ${PROJECT_NAME} || true
+                        docker run -d \
+                          --restart always \
+                          --network ${NETWORK} \
+                          --name ${PROJECT_NAME} \
+                          --env-file ${ENV_FILE} \
+                          -e JAVA_OPTS="${JAVA_OPTS}" \
+                          -p ${PUERTO_HTTP}:${PUERTO_HTTP} \
+                          --memory=${CONTAINER_MEMORY} \
+                          --cpus=${CONTAINER_CPUS} \
+                          ${DOCKER_IMAGE}
+                    '
+                    """
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Deploy completado gps-plataforma-core-dev en entorno DEV"
+        }
+        failure {
+            echo "❌ Error en el pipeline"
+        }
+    }
+}
