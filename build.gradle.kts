@@ -39,11 +39,14 @@ dependencies {
     annotationProcessor("org.projectlombok:lombok:1.18.26")
     compileOnly("org.projectlombok:lombok:1.18.26")
     
-    implementation("com.auth0:java-jwt:4.4.0")
+    // OpenAPI
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.1.0")
+    
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     
     // Web starter needed for eventual health checks or simple controller if needed
     implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-websocket")
     
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("org.apache.commons:commons-jexl3:3.3")

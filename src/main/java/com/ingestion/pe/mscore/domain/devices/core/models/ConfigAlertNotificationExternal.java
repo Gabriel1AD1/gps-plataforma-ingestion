@@ -1,7 +1,7 @@
 package com.ingestion.pe.mscore.domain.devices.core.models;
 
 import com.ingestion.pe.mscore.commons.models.enums.TimeZone;
-import com.ingestion.pe.mscore.domain.auth.core.enums.NotificationTypes;
+import com.ingestion.pe.mscore.commons.models.enums.NotificationTypes;
 import jakarta.validation.constraints.NotNull;
 import java.util.Set;
 import lombok.*;

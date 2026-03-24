@@ -4,6 +4,7 @@ import com.ingestion.pe.mscore.bridge.pub.models.ApplicationEventCreate;
 import com.ingestion.pe.mscore.bridge.pub.models.enums.ApplicationName;
 import com.ingestion.pe.mscore.bridge.pub.models.enums.ModuleName;
 import com.ingestion.pe.mscore.clients.models.VehicleResponse;
+import com.ingestion.pe.mscore.commons.models.enums.NotificationTypes;
 import com.ingestion.pe.mscore.commons.models.enums.EventTypeEnumerated;
 import com.ingestion.pe.mscore.domain.devices.core.entity.DeviceConfigAlertsEntity;
 import com.ingestion.pe.mscore.domain.devices.core.entity.DeviceEntity;

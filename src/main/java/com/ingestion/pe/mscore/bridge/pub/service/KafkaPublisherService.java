@@ -18,6 +18,9 @@ public class KafkaPublisherService {
     @Value("${kafka.topic.websocket}")
     private String websocketTopic;
 
+    @Value("${kafka.topic.notifications}")
+    private String notificationsTopic;
+
     public void publishWebsocketMessage(WebsocketMessage message) {
         try {
             String payload = JsonUtils.toJson(message);
@@ -27,4 +30,15 @@ public class KafkaPublisherService {
             log.error("Error publicando mensaje websocket: {}", e.getMessage(), e);
         }
     }
+
+//     public void publishNotificationEvent(Object event) {
+//         try {
+//             String payload = JsonUtils.toJson(event);
+//             kafkaTemplate.send(notificationsTopic, payload);
+//             log.info("Evento de notificación publicado a topic '{}': {}", notificationsTopic, payload);
+//         } catch (Exception e) {
+//             log.error("Error publicando evento de notificación a Kafka: {}", e.getMessage(), e);
+//         }
+//     }
 }
+
