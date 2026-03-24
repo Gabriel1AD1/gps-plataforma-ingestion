@@ -1,0 +1,25 @@
+<configuration>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>
+                %green(%d{yyyy-MM-dd HH:mm:ss})  %highlight(%-5level)
+                applicationName[%X{applicationName}]
+                requestId[%X{requestId}]
+                userId[%X{userId}]
+                companyId-[%X{companyId}]
+                clientIp[%X{clientIp}]
+                path[%X{path}]
+                correlationId[%X{correlationId}]
+                %cyan(%logger{36}) - %msg%n
+            </pattern>
+        </encoder>
+    </appender>
+
+   <logger name="org.springframework" level="WARN"/>
+    <logger name="org.hibernate" level="WARN"/>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>
