@@ -11,7 +11,7 @@ pipeline {
         SERVER_USER        = "root"
         SERVER_HOST        = "173.249.36.100"
         SERVER_PORT        = "22"
-        PUERTO_HTTP        = "4365"
+        PUERTO_HTTP        = "4375"
         SSH_CREDENTIAL_ID  = 'yaw-iot'
         ENV_FILE           = '/home/gps-plataforma/ms-core/.env'
 
@@ -19,7 +19,7 @@ pipeline {
         CONTAINER_CPUS     = "2"
         JAVA_OPTS          = "-Xms512m -Xmx1536m"
         INSTANCES          = "3"
-        BASE_PORT          = "4365"
+        BASE_PORT          = "4375"
     }
 
     stages {

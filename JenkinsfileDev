@@ -11,7 +11,7 @@ pipeline {
         SERVER_USER      = "root"
         SERVER_HOST      = "173.249.36.100"
         SERVER_PORT      = "22"
-        PUERTO_HTTP      = "4360"
+        PUERTO_HTTP      = "4370"
         SSH_CREDENTIAL_ID  = 'yaw-iot'
         ENV_FILE        = '/home/gps-plataforma-dev/ms-core/.env'
 
