@@ -44,7 +44,8 @@ public class DistanceCalculator {
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         double distance = EARTH_RADIUS_KM * c;
 
-        log.trace("Distancia calculada: {:.2f} km", distance);
+        //log.trace("Distancia calculada: {:.2f} km", distance);
+        log.trace("Distancia calculada: {} km", String.format("%.2f", distance));
         return distance;
     }
 
@@ -90,8 +91,8 @@ public class DistanceCalculator {
 
                 double newTotal = existingData.getCumulativeDistance() + delta;
                 cacheDao.save(cacheKey, new DistanceData(newPosition, newTotal), CACHE_TTL_SECONDS);
-                log.debug("Distancia actualizada para IMEI {}: +{:.2f} km, total: {:.2f} km",
-                        newPosition.getImei(), delta, newTotal);
+                log.debug("Distancia actualizada para IMEI {}: +{} km, total: {} km",
+                        newPosition.getImei(), String.format("%.2f", delta), String.format("%.2f", newTotal));
             }
         } catch (Exception e) {
             log.error("Fallo al actualizar distancia para el IMEI {} en Redis caché: {}",

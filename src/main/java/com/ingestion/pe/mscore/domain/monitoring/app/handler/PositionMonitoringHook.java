@@ -76,25 +76,29 @@ public class PositionMonitoringHook {
                 return;
             }
 
-            if (state.getLastLatitude() != null && state.getLastUpdateTime() != null) {
-                if (speedKmh > MAX_BUS_SPEED_KMH) {
-                    log.warn("GPS anomalía descartada (Velocidad Nativa): tripId={}, speedKmh={}",
-                            state.getTripId(), String.format("%.1f", speedKmh));
-                    return;
-                }
+                     
+            double jumpKm = HaversineCalculator.distanceKm(state.getLastLatitude(), state.getLastLongitude(), lat, lon);
+            double deltaHours = Duration.between(state.getLastUpdateTime(), time).toMillis() / 3600000.0;
+            boolean isAnomaly = false;
 
-                double jumpKm = HaversineCalculator.distanceKm(
-                        state.getLastLatitude(), state.getLastLongitude(), lat, lon);
-                long deltaSeconds = Duration.between(state.getLastUpdateTime(), time).getSeconds();
-
-                if (deltaSeconds > 0) {
-                    double calculatedSpeedKmh = (jumpKm / deltaSeconds) * 3600.0;
-                    if (calculatedSpeedKmh > (MAX_BUS_SPEED_KMH + 30.0)) {
-                        log.warn("GPS anomalía descartada (Salto Haversine): tripId={}, calcSpeed={}",
-                                state.getTripId(), String.format("%.1f", calculatedSpeedKmh));
-                        return;
-                    }
+            if (speedKmh > MAX_BUS_SPEED_KMH) {
+                log.warn("GPS anomalía detectada (Velocidad Nativa): tripId={}, speedKmh={}", 
+                        state.getTripId(), String.format("%.1f", speedKmh));
+                isAnomaly = true;
+            } else if (deltaHours > 0) {
+                double calculatedSpeedKmh = jumpKm / deltaHours;
+                if (calculatedSpeedKmh > (MAX_BUS_SPEED_KMH + 30.0)) {
+                    log.warn("GPS anomalía detectada (Salto Haversine): tripId={}, calcSpeed={}", 
+                            state.getTripId(), String.format("%.1f", calculatedSpeedKmh));
+                    isAnomaly = true;
                 }
+            }
+
+            if (isAnomaly) {
+                state.setLastUpdateTime(time);
+                tripStateManager.updateState(state.getTripId(), state);
+                publishTripStateUpdate(state);
+                return;
             }
 
             int currentIndex = state.getCurrentPointIndex();
