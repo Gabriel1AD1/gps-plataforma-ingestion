@@ -37,7 +37,7 @@ public class AtuWebSocketClientAdapter implements AtuWebSocketPort {
             String jsonPayload = objectMapper.writeValueAsString(payload);
             session.sendMessage(new TextMessage(jsonPayload));
             
-            log.debug("Trama WS ATU enviada correctamente para IMEI={} con Token={}", payload.getImei(), truncateToken(token));
+            log.info("[ATU] Trama WS enviada correctamente para IMEI={} a {}", payload.getImei(), endpoint);
         } catch (Exception e) {
             log.error("Error enviando trama WS ATU para IMEI={}: {}", payload.getImei(), e.getMessage());
             sessionsByToken.remove(token);
@@ -95,10 +95,10 @@ public class AtuWebSocketClientAdapter implements AtuWebSocketPort {
                 log.debug("Respuesta WS ATU cruda: {}", payload);
                 
                 AtuResponse response = objectMapper.readValue(payload, AtuResponse.class);
-                if (response.isSuccess()) { // "00"
-                    log.debug("Trama procesada correctamente por ATU (Identificador={})", response.getIdentifier());
+                if (response.isSuccess()) {
+                    log.info("[ATU] Trama procesada correctamente por servidor ATU (Identificador={})", response.getIdentifier());
                 } else {
-                    log.warn("ATU rechazó la trama. Código: {} - {}. Identifier: {}", 
+                    log.warn("[ATU] Servidor rechazó la trama. Código: {} - {}. Identifier: {}", 
                             response.getCode(), response.getMessage(), response.getIdentifier());
                 }
             } catch (Exception e) {

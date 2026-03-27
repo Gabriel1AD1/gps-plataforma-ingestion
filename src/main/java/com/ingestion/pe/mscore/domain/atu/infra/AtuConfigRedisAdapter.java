@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 public class AtuConfigRedisAdapter implements AtuConfigPort {
 
     private final CacheDao<AtuTokenCache> cacheDao;
+    private final com.ingestion.pe.mscore.domain.atu.core.repo.AtuTokenReadEntityRepository atuTokenReadEntityRepository;
     private static final String KEY_PREFIX = "atu:company:token:";
 
     @Override
@@ -22,9 +23,24 @@ public class AtuConfigRedisAdapter implements AtuConfigPort {
         
         String key = KEY_PREFIX + companyId;
         try {
-            return cacheDao.get(key, AtuTokenCache.class);
+            Optional<AtuTokenCache> cached = cacheDao.get(key, AtuTokenCache.class);
+            if (cached.isPresent()) {
+                return cached;
+            }
+            
+            log.warn("[REDIS] Token ATU para companyId={} no encontrado en cache. Fallback a DB.", companyId);
+            return atuTokenReadEntityRepository.findByCompanyId(companyId)
+                    .map(entity -> {
+                        AtuTokenCache cache = AtuTokenCache.builder()
+                                .token(entity.getToken())
+                                .endpoint(entity.getEndpoint())
+                                .build();
+                        cacheDao.save(key, cache, 3600);
+                        return cache;
+                    });
+            
         } catch (Exception e) {
-            log.warn("Error leyendo configuración ATU para companyId={} desde Redis: {}", companyId, e.getMessage());
+            log.error("Error leyendo config ATU para companyId={} (Fallback intentado): {}", companyId, e.getMessage());
             return Optional.empty();
         }
     }

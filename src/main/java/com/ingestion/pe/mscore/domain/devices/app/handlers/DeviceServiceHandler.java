@@ -107,7 +107,7 @@ public class DeviceServiceHandler {
                                 deviceConfigAlertsEntityRepository.saveAll(configAlertsEntities);
 
                                 sendNewPosition(device, historicalSave, company);
-                                
+
                                 // eventCreateBridgeService.createEvent(
                                 // DevicePositionEventCreate.builder()
                                 // .deviceId(device.getId())

@@ -77,7 +77,9 @@ public class PositionMonitoringHook {
             }
 
                      
-            double jumpKm = HaversineCalculator.distanceKm(state.getLastLatitude(), state.getLastLongitude(), lat, lon);
+            double jumpKm = (state.getLastLatitude() != null && state.getLastLongitude() != null)
+                    ? HaversineCalculator.distanceKm(state.getLastLatitude(), state.getLastLongitude(), lat, lon)
+                    : 0.0;
             double deltaHours = Duration.between(state.getLastUpdateTime(), time).toMillis() / 3600000.0;
             boolean isAnomaly = false;
 

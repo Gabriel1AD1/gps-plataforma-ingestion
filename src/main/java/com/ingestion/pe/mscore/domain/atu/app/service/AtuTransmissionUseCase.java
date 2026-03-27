@@ -39,20 +39,21 @@ public class AtuTransmissionUseCase {
         try {
             Optional<AtuTokenCache> configOpt = atuConfigPort.getAtuConfig(companyId);
             if (configOpt.isEmpty()) {
-                log.trace("ATU skip: companyId={} sin token ATU configurado", companyId);
+                log.info("ATU skip: companyId={} sin token ATU configurado en Redis/DB", companyId);
                 return;
             }
             AtuTokenCache config = configOpt.get();
 
             Optional<Long> vehicleIdOpt = routeConfigClient.getVehicleIdByDeviceId(deviceId);
             if (vehicleIdOpt.isEmpty()) {
-                log.trace("ATU skip: deviceId={} sin vehículo asociado en caché", deviceId);
+                log.info("ATU skip: deviceId={} sin vehículo asociado en caché (Verificar sincronización)", deviceId);
                 return;
             }
 
             Optional<TripState> tripStateOpt = tripStateManager.getStateByVehicleId(vehicleIdOpt.get());
             if (tripStateOpt.isEmpty()) {
-                log.trace("ATU skip: vehicleId={} sin viaje activo (TripState)", vehicleIdOpt.get());
+                log.info("ATU skip: vehicleId={} sin viaje activo detectado en Ingestion (TripState)",
+                        vehicleIdOpt.get());
                 return;
             }
             TripState tripState = tripStateOpt.get();
@@ -60,18 +61,24 @@ public class AtuTransmissionUseCase {
             Instant deviceTime = (position.getDeviceTime() != null)
                     ? position.getDeviceTime().toInstant()
                     : Instant.now();
-            long staleMinutes = Duration.between(deviceTime, Instant.now()).toMinutes();
+            Instant nowTime = Instant.now();
+            long staleMinutes = Duration.between(deviceTime, nowTime).toMinutes();
+
+            log.info("[ATU DEBUG] Evaluación de tiempos: IMEI={} | DeviceTime={} | PositionServerTime={} | SystemNow={} | Antigüedad={}min",
+                    position.getImei(), deviceTime, position.getServerTime(), nowTime, staleMinutes);
+
             if (staleMinutes > STALE_THRESHOLD_MINUTES) {
-                log.warn("ATU trama descartada: IMEI={} antigüedad={}min (>{}min). Pendiente para envío REST Lote cuando ATU habilite el endpoint.",
-                        position.getImei(), staleMinutes, STALE_THRESHOLD_MINUTES);
+                log.warn("ATU trama descartada por ANTIGÜEDAD: IMEI={} antigüedad={}min (>{}min). DeviceTime={} Now={}",
+                        position.getImei(), staleMinutes, STALE_THRESHOLD_MINUTES, deviceTime, nowTime);
                 return;
             }
+
 
             String imei = position.getImei();
             Instant lastSent = lastTransmissionByImei.get(imei);
             Instant now = Instant.now();
             if (lastSent != null && Duration.between(lastSent, now).getSeconds() < RATE_LIMIT_SECONDS) {
-                log.trace("ATU skip: IMEI={} rate limit activo ({}s desde último envío)",
+                log.info("ATU rate limit: IMEI={} ({}s desde último envío)",
                         imei, Duration.between(lastSent, now).getSeconds());
                 return;
             }
@@ -114,6 +121,8 @@ public class AtuTransmissionUseCase {
                 return;
             }
 
+            log.info("[ATU] Preparando JSON para envío: IMEI={}, Placa={}, Ruta={}",
+                    payload.getImei(), payload.getLicensePlate(), payload.getRouteId());
             atuWebSocketPort.sendPayload(config.getToken(), config.getEndpoint(), payload);
 
             lastTransmissionByImei.put(imei, now);
@@ -137,7 +146,8 @@ public class AtuTransmissionUseCase {
     }
 
     private int mapDirection(String direction) {
-        if (direction == null) return 0;
+        if (direction == null)
+            return 0;
         return switch (direction.toUpperCase()) {
             case "INBOUND" -> 1;
             default -> 0;
@@ -145,21 +155,34 @@ public class AtuTransmissionUseCase {
     }
 
     private String truncate(String value, int maxLength) {
-        if (value == null) return "";
+        if (value == null)
+            return "";
         return value.length() > maxLength ? value.substring(0, maxLength) : value;
     }
 
     private boolean isValidPayload(AtuPayload payload) {
-        if (payload.getImei() == null || !payload.getImei().matches("^[a-zA-Z0-9]{15}$")) return false;
-        if (payload.getLicensePlate() == null || !payload.getLicensePlate().matches("^[a-zA-Z0-9-]{1,7}$")) return false;
-        if (payload.getLatitude() < -90 || payload.getLatitude() > 90) return false;
-        if (payload.getLongitude() < -180 || payload.getLongitude() > 180) return false;
-        if (payload.getSpeed() < 0 || payload.getSpeed() > 999.99) return false;
-        if (payload.getRouteId() == null || payload.getRouteId().length() > 10 || !payload.getRouteId().matches("^[a-zA-Z0-9]+$")) return false;
-        if (payload.getDirectionId() != 0 && payload.getDirectionId() != 1) return false;
-        if (payload.getDriverId() == null || payload.getDriverId().length() > 20 || !payload.getDriverId().matches("^[a-zA-Z0-9]+$")) return false;
-        if (payload.getIdentifier() == null || payload.getIdentifier().isBlank() || payload.getIdentifier().length() > 50 || !payload.getIdentifier().matches("^[a-zA-Z0-9]+$")) return false;
-        
+        if (payload.getImei() == null || !payload.getImei().matches("^[a-zA-Z0-9]{15}$"))
+            return false;
+        if (payload.getLicensePlate() == null || !payload.getLicensePlate().matches("^[a-zA-Z0-9-]{1,7}$"))
+            return false;
+        if (payload.getLatitude() < -90 || payload.getLatitude() > 90)
+            return false;
+        if (payload.getLongitude() < -180 || payload.getLongitude() > 180)
+            return false;
+        if (payload.getSpeed() < 0 || payload.getSpeed() > 999.99)
+            return false;
+        if (payload.getRouteId() == null || payload.getRouteId().length() > 10
+                || !payload.getRouteId().matches("^[a-zA-Z0-9]+$"))
+            return false;
+        if (payload.getDirectionId() != 0 && payload.getDirectionId() != 1)
+            return false;
+        if (payload.getDriverId() == null || payload.getDriverId().length() > 20
+                || !payload.getDriverId().matches("^[a-zA-Z0-9]+$"))
+            return false;
+        if (payload.getIdentifier() == null || payload.getIdentifier().isBlank()
+                || payload.getIdentifier().length() > 50 || !payload.getIdentifier().matches("^[a-zA-Z0-9]+$"))
+            return false;
+
         return true;
     }
 }

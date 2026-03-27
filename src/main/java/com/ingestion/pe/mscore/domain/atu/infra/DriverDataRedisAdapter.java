@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 public class DriverDataRedisAdapter implements DriverDataPort {
 
     private final CacheDao<DriverCacheData> cacheDao;
+    private final com.ingestion.pe.mscore.domain.drivers.core.repo.DriverReadEntityRepository driverReadEntityRepository;
     private static final String KEY_PREFIX = "driver:data:";
 
     @Override
@@ -22,11 +23,27 @@ public class DriverDataRedisAdapter implements DriverDataPort {
 
         String key = KEY_PREFIX + driverId;
         try {
-            return cacheDao.get(key, DriverCacheData.class)
+            Optional<String> cached = cacheDao.get(key, DriverCacheData.class)
                     .map(DriverCacheData::getDocumentNumber)
                     .filter(doi -> !doi.isBlank());
+            
+            if (cached.isPresent()) {
+                return cached;
+            }
+
+            log.warn("[REDIS] DNI de conductor para driverId={} no encontrado en cache. Fallback a DB.", driverId);
+            return driverReadEntityRepository.findById(driverId)
+                    .map(entity -> {
+                        DriverCacheData data = DriverCacheData.builder()
+                                .documentNumber(entity.getDocumentNumber())
+                                .build();
+                        cacheDao.save(key, data, 3600);
+                        return entity.getDocumentNumber();
+                    })
+                    .filter(doi -> !doi.isBlank());
+
         } catch (Exception e) {
-            log.warn("Error leyendo DNI de conductor en Redis para driverId={}: {}", driverId, e.getMessage());
+            log.error("Error leyendo DNI de conductor para driverId={} (Fallback intentado): {}", driverId, e.getMessage());
             return Optional.empty();
         }
     }
