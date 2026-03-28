@@ -17,6 +17,9 @@ public interface DeviceEntityRepository extends JpaRepository<DeviceEntity, Long
     @EntityGraph(attributePaths = { "overrideSensors" })
     Optional<DeviceEntity> findByImei(String imei);
 
+    @EntityGraph(attributePaths = { "overrideSensors" })
+    List<DeviceEntity> findByImeiIn(java.util.Collection<String> imeis);
+
     @Modifying
     @Transactional
     @Query("""
@@ -26,18 +29,18 @@ public interface DeviceEntityRepository extends JpaRepository<DeviceEntity, Long
 
                 d.lastConnection =
                     case
-                        when :status = 'online' then CURRENT_TIMESTAMP
+                        when :status = 'online' then :now
                         else d.lastConnection
                     end,
 
                 d.lastDisconnection =
                     case
-                        when :status = 'offline' then CURRENT_TIMESTAMP
+                        when :status = 'offline' then :now
                         else d.lastDisconnection
                     end,
-                d.updated = CURRENT_TIMESTAMP
+                d.updated = :now
             """)
-    void updateAllStatuses(@Param("status") DeviceStatus status);
+    void updateAllStatuses(@Param("status") DeviceStatus status, @Param("now") java.time.Instant now);
 
     @Query("""
             SELECT new com.ingestion.pe.mscore.domain.devices.core.dto.response.DevicesStatusSummary(

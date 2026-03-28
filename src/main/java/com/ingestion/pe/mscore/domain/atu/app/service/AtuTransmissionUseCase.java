@@ -13,9 +13,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -26,14 +27,14 @@ public class AtuTransmissionUseCase {
     private static final int STALE_THRESHOLD_MINUTES = 10;
     private static final int RATE_LIMIT_SECONDS = 20;
     private static final String DEFAULT_DRIVER_DOI = "00000000";
+    private static final String ATU_RATE_LIMIT_PREFIX = "atu:ratelimit:";
 
     private final AtuConfigPort atuConfigPort;
     private final DriverDataPort driverDataPort;
     private final AtuWebSocketPort atuWebSocketPort;
     private final TripStateManager tripStateManager;
     private final RouteConfigClient routeConfigClient;
-
-    private final ConcurrentHashMap<String, Instant> lastTransmissionByImei = new ConcurrentHashMap<>();
+    private final RedisTemplate<String, Object> redisTemplate;
 
     public void evaluateAndTransmit(Position position, Long deviceId, Long companyId) {
         try {
@@ -73,14 +74,22 @@ public class AtuTransmissionUseCase {
                 return;
             }
 
-
             String imei = position.getImei();
-            Instant lastSent = lastTransmissionByImei.get(imei);
+            String rateLimitKey = ATU_RATE_LIMIT_PREFIX + imei;
+            Object lastSentVal = redisTemplate.opsForValue().get(rateLimitKey);
             Instant now = Instant.now();
-            if (lastSent != null && Duration.between(lastSent, now).getSeconds() < RATE_LIMIT_SECONDS) {
-                log.info("ATU rate limit: IMEI={} ({}s desde último envío)",
-                        imei, Duration.between(lastSent, now).getSeconds());
-                return;
+
+            if (lastSentVal != null) {
+                try {
+                    long lastSentTs = Long.parseLong(lastSentVal.toString());
+                    if ((now.toEpochMilli() - lastSentTs) < (RATE_LIMIT_SECONDS * 1000L)) {
+                        log.info("ATU rate limit: IMEI={} ({}ms desde último envío)",
+                                imei, (now.toEpochMilli() - lastSentTs));
+                        return;
+                    }
+                } catch (NumberFormatException e) {
+                    log.warn("Valor inválido en Redis para rate-limit ATU: {}. Ignorando.", lastSentVal);
+                }
             }
 
             String routeId = resolveRouteId(tripState);
@@ -125,7 +134,8 @@ public class AtuTransmissionUseCase {
                     payload.getImei(), payload.getLicensePlate(), payload.getRouteId());
             atuWebSocketPort.sendPayload(config.getToken(), config.getEndpoint(), payload);
 
-            lastTransmissionByImei.put(imei, now);
+            // Guardar el timestamp en Redis con un TTL > rate limit
+            redisTemplate.opsForValue().set(rateLimitKey, String.valueOf(now.toEpochMilli()), RATE_LIMIT_SECONDS, TimeUnit.SECONDS);
 
             log.debug("ATU trama enviada: IMEI={} routeId={} direction={} driverId={}",
                     imei, routeId, directionId, driverDoi);

@@ -21,7 +21,7 @@ public class EventResolver {
   private final UserCache userCache;
   private final KafkaNotificationProducer notificationProducer;
 
-  @Async
+  @Async("asyncExecutor")
   public void resolveEvent(EventEntity eventEntity) {
     NotificationData notificationData = new NotificationData();
     List<Long> internals =

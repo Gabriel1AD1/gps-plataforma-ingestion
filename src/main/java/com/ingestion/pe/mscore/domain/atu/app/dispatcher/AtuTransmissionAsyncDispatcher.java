@@ -17,7 +17,7 @@ public class AtuTransmissionAsyncDispatcher {
 
     private final AtuTransmissionUseCase atuTransmissionUseCase;
 
-    @Async
+    @Async("asyncExecutor")
     public void dispatchAsync(Position position, Long deviceId, Long companyId) {
         try {
             atuTransmissionUseCase.evaluateAndTransmit(position, deviceId, companyId);

@@ -25,7 +25,7 @@ public class StatusDeviceServiceHandler {
     public void handleStatusDeviceService(StatusDevice message) {
         try {
             if (message.getResetDevices()) {
-                deviceEntityRepository.updateAllStatuses(message.getStatus());
+                deviceEntityRepository.updateAllStatuses(message.getStatus(), java.time.Instant.now());
             } else {
                 var deviceEntity = deviceEntityRepository.findById(message.getDeviceId());
                 deviceEntity.ifPresent(

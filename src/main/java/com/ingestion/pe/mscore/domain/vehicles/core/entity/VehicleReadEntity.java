@@ -32,7 +32,7 @@ public class VehicleReadEntity {
     @Column(insertable = false, updatable = false)
     private String model;
 
-    @Column(insertable = false, updatable = false)
+    @Column(name = "\"year\"", insertable = false, updatable = false)
     private Integer year;
 
     @Column(insertable = false, updatable = false)
