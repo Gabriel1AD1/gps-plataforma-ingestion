@@ -18,9 +18,7 @@ import com.ingestion.pe.mscore.domain.geofences.core.repo.GeofenceReadEntityRepo
 import com.ingestion.pe.mscore.domain.vehicles.core.entity.VehicleGeofenceEntity;
 import com.ingestion.pe.mscore.domain.vehicles.core.repo.VehicleGeofenceEntityRepository;
 import java.time.Instant;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,86 +42,77 @@ public class TrackingProcessorService {
     private final GeofenceReadEntityRepository geofenceReadEntityRepository;
     private final com.ingestion.pe.mscore.domain.devices.core.repo.UserDeviceEntityRepository userDeviceEntityRepository;
 
-
     private static final long GEOFENCE_CACHE_TTL_SECONDS = 600;
 
-    public void processPositionForTracking(Position position, Long companyId) {
-        if (position == null || companyId == null || companyId == 0L) {
-            log.warn("No se puede procesar la posición: posición inválida o companyId faltante");
+    public void processPositionsBatchForTracking(String imei, List<Position> positions, Long companyId) {
+        if (positions == null || positions.isEmpty() || companyId == null || companyId == 0L) {
             return;
         }
 
+        log.debug("Procesando lote de tracking para IMEI {}: {} posiciones", imei, positions.size());
+
+        // Cache de exclusiones
+        Set<UUID> excludedUsers = userDeviceEntityRepository.findExcludedUuidsByDeviceImei(imei);
+
+        for (Position position : positions) {
+            processSinglePositionInternal(position, companyId, excludedUsers);
+        }
+    }
+
+    public void processPositionForTracking(Position position, Long companyId) {
+        if (position == null || companyId == null || companyId == 0L) return;
+        Set<UUID> excludedUsers = userDeviceEntityRepository.findExcludedUuidsByDeviceImei(position.getImei());
+        processSinglePositionInternal(position, companyId, excludedUsers);
+    }
+
+    private void processSinglePositionInternal(Position position, Long companyId, Set<UUID> excludedUsers) {
         try {
             distanceCalculator.updateDistance(position, companyId);
 
-            String companyGeofencesKey = "geofence:company:" + companyId;
-            Object idsObj = redisTemplate.opsForValue().get(companyGeofencesKey);
-
-            List<Long> geofenceIds;
-            if (idsObj instanceof List<?>) {
-                geofenceIds = ((List<?>) idsObj).stream()
-                        .filter(Objects::nonNull)
-                        .map(obj -> Long.parseLong(obj.toString()))
-                        .collect(Collectors.toList());
-            } else if (idsObj == null) {
-                // Cache miss para la lista de empresa — fallback a PostgreSQL
-                log.debug("Cache miss en geofence:company:{} — consultando PostgreSQL", companyId);
-                geofenceIds = geofenceReadEntityRepository.findAllByCompanyId(companyId)
-                        .stream()
-                        .map(GeofenceReadEntity::getId)
-                        .collect(Collectors.toList());
-                if (geofenceIds.isEmpty()) {
-                    log.debug("No se encontraron geocercas activas para companyId={}", companyId);
-                    return;
-                }
-            } else {
-                log.warn("Tipo inesperado para geocercas de la empresa en Redis: {}", idsObj.getClass());
-                return;
-            }
-
-            if (geofenceIds.isEmpty()) {
-                return;
-            }
-
-            log.debug("Revisando {} geocercas para IMEI={}", geofenceIds.size(), position.getImei());
+            List<Long> geofenceIds = getCompanyGeofenceIds(companyId);
+            if (geofenceIds.isEmpty()) return;
 
             for (Long geofenceId : geofenceIds) {
                 GeofenceResponse geofence = getGeofenceWithFallback(geofenceId, companyId);
-                if (geofence == null) {
-                    log.warn("Geocerca id={} no encontrada en Redis ni PostgreSQL, se omite", geofenceId);
-                    continue;
-                }
-                detectGeofenceEvent(position, geofence, companyId);
+                if (geofence == null) continue;
+                detectGeofenceEvent(position, geofence, companyId, excludedUsers);
             }
-
         } catch (Exception e) {
-            log.error("Error al calcular métricas de seguimiento para la posición: {}", e.getMessage(), e);
+            log.error("Error en tracking para IMEI {}: {}", position.getImei(), e.getMessage());
         }
+    }
+
+    private List<Long> getCompanyGeofenceIds(Long companyId) {
+        String companyGeofencesKey = "geofence:company:" + companyId;
+        Object idsObj = redisTemplate.opsForValue().get(companyGeofencesKey);
+
+        if (idsObj instanceof List<?>) {
+            return ((List<?>) idsObj).stream()
+                    .filter(Objects::nonNull)
+                    .map(obj -> Long.parseLong(obj.toString()))
+                    .collect(Collectors.toList());
+        } else if (idsObj == null) {
+            List<Long> ids = geofenceReadEntityRepository.findAllByCompanyId(companyId)
+                    .stream()
+                    .map(GeofenceReadEntity::getId)
+                    .collect(Collectors.toList());
+            return ids;
+        }
+        return Collections.emptyList();
     }
 
     private GeofenceResponse getGeofenceWithFallback(Long geofenceId, Long companyId) {
         String geofenceKey = "geofence:" + companyId + ":" + geofenceId;
         Optional<GeofenceResponse> cached = geofenceCacheDao.get(geofenceKey, GeofenceResponse.class);
-        if (cached.isPresent()) {
-            return cached.get();
-        }
+        if (cached.isPresent()) return cached.get();
 
-        log.debug("Cache miss geofence id={} companyId={} — consultando PostgreSQL", geofenceId, companyId);
-        Optional<GeofenceReadEntity> entityOpt = geofenceReadEntityRepository.findById(geofenceId);
-        if (entityOpt.isEmpty()) {
-            return null;
-        }
-
-        GeofenceReadEntity entity = entityOpt.get();
-        GeofenceResponse response = toGeofenceResponse(entity);
-
-        vehicleGeofenceEntityRepository.findFirstByGeofenceId(geofenceId)
-                .ifPresent(vg -> response.setVehicleId(vg.getVehicleId()));
-
-        geofenceCacheDao.save(geofenceKey, response, GEOFENCE_CACHE_TTL_SECONDS);
-        log.debug("Geocerca id={} cargada de PostgreSQL y guardada en Redis", geofenceId);
-
-        return response;
+        return geofenceReadEntityRepository.findById(geofenceId).map(entity -> {
+            GeofenceResponse response = toGeofenceResponse(entity);
+            vehicleGeofenceEntityRepository.findFirstByGeofenceId(geofenceId)
+                    .ifPresent(vg -> response.setVehicleId(vg.getVehicleId()));
+            geofenceCacheDao.save(geofenceKey, response, GEOFENCE_CACHE_TTL_SECONDS);
+            return response;
+        }).orElse(null);
     }
 
     private GeofenceResponse toGeofenceResponse(GeofenceReadEntity entity) {
@@ -136,24 +125,17 @@ public class TrackingProcessorService {
         r.setLongitudeCenter(entity.getLongitudeCenter());
         r.setRadiusInMeters(entity.getRadiusInMeters());
         r.setType(entity.getType());
-        r.setPoints(null);
         return r;
     }
 
-    private void detectGeofenceEvent(Position position, GeofenceResponse geofence, Long companyId) {
+    private void detectGeofenceEvent(Position position, GeofenceResponse geofence, Long companyId, Set<UUID> excludedUsers) {
         boolean currentlyInside = geofenceEvaluator.isInside(geofence, position.getLatitude(), position.getLongitude());
         GeofenceStatus currentStatus = currentlyInside ? GeofenceStatus.INSIDE : GeofenceStatus.OUTSIDE;
 
-        Optional<GeofenceStatus> previousStatusOpt = geofenceStatusCacheStore.get(companyId, position.getImei(),
-                geofence.getId());
-
+        Optional<GeofenceStatus> previousStatusOpt = geofenceStatusCacheStore.get(companyId, position.getImei(), geofence.getId());
         geofenceStatusCacheStore.save(companyId, position.getImei(), geofence.getId(), currentStatus);
 
-        if (previousStatusOpt.isEmpty() || previousStatusOpt.get() == GeofenceStatus.UNKNOWN) {
-            log.debug("Primera detección: IMEI={}, geofence={}, status={}", position.getImei(), geofence.getName(),
-                    currentStatus);
-            return;
-        }
+        if (previousStatusOpt.isEmpty() || previousStatusOpt.get() == GeofenceStatus.UNKNOWN) return;
 
         GeofenceStatus previousStatus = previousStatusOpt.get();
         GeofenceEventType eventType = null;
@@ -165,12 +147,11 @@ public class TrackingProcessorService {
         }
 
         if (eventType != null) {
-            publishEvent(position, geofence, companyId, eventType);
+            publishEvent(position, geofence, companyId, eventType, excludedUsers);
         }
     }
 
-    private void publishEvent(Position position, GeofenceResponse geofence, Long companyId,
-            GeofenceEventType eventType) {
+    private void publishEvent(Position position, GeofenceResponse geofence, Long companyId, GeofenceEventType eventType, Set<UUID> excludedUsers) {
         log.info("{} detectada: IMEI={}, geofence={}", eventType, position.getImei(), geofence.getName());
 
         GeofenceEventDto eventDto = GeofenceEventDto.builder()
@@ -184,23 +165,9 @@ public class TrackingProcessorService {
                 .deviceTime(position.getDeviceTime() != null ? position.getDeviceTime().toInstant() : Instant.now())
                 .build();
 
-        // kafkaBusinessEventPublisher.publishGeofenceEvent(eventDto);
-
-        VehicleGeofenceEntity geofenceConfig;
-        if (geofence.getVehicleId() != null) {
-            geofenceConfig = vehicleGeofenceEntityRepository
-                    .findByVehicleIdAndGeofenceId(geofence.getVehicleId(), geofence.getId())
-                    .orElse(null);
-        } else {
-            geofenceConfig = vehicleGeofenceEntityRepository
-                    .findFirstByGeofenceId(geofence.getId())
-                    .orElse(null);
-        }
-        if (geofenceConfig == null) {
-            log.debug("Sin configuracion de notificación activa para geofenceId={}", geofence.getId());
-        }
-        
-        java.util.Set<java.util.UUID> excludedUsers = userDeviceEntityRepository.findExcludedUuidsByDeviceImei(position.getImei());
+        VehicleGeofenceEntity geofenceConfig = (geofence.getVehicleId() != null)
+                ? vehicleGeofenceEntityRepository.findByVehicleIdAndGeofenceId(geofence.getVehicleId(), geofence.getId()).orElse(null)
+                : vehicleGeofenceEntityRepository.findFirstByGeofenceId(geofence.getId()).orElse(null);
 
         ApplicationEventCreate appEvent = GeofenceApplicationEventFactory.forGeofenceEvent(eventDto, geofenceConfig, excludedUsers);
         try {
@@ -208,8 +175,7 @@ public class TrackingProcessorService {
             eventEntity = eventEntityRepository.save(eventEntity);
             eventResolver.resolveEvent(eventEntity);
         } catch (Exception e) {
-            log.error("Error persistiendo EventEntity de geocerca IMEI={} geofence={}: {}",
-                    position.getImei(), geofence.getId(), e.getMessage(), e);
+            log.error("Error persistiendo evento de geocerca IMEI={}: {}", position.getImei(), e.getMessage());
         }
     }
 }

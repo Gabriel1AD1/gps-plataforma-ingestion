@@ -195,6 +195,11 @@ public class DeviceEntity {
     @Column(name = "updated", nullable = false)
     private Instant updated;
 
+    @Version
+    @Column(name = "version")
+    @Comment("Control de concurrencia optimista")
+    private Long version;
+
     @Column(name = "device_time", nullable = false)
     @ColumnDefault("CURRENT_TIMESTAMP")
     private Instant deviceTime;
