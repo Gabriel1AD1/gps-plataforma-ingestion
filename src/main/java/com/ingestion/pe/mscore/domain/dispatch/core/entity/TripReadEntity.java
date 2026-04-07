@@ -43,4 +43,13 @@ public class TripReadEntity {
 
     @Column(name = "arrival_terminal_id", insertable = false, updatable = false)
     private Long arrivalTerminalId;
+
+    @Column(name = "driver_full_name", insertable = false, updatable = false)
+    private String driverFullName;
+
+    @Column(name = "driver_document_number", insertable = false, updatable = false)
+    private String driverDocumentNumber;
+
+    @Column(name = "atu_route_code", insertable = false, updatable = false)
+    private String atuRouteCode;
 }

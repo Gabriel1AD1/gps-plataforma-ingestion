@@ -250,14 +250,17 @@ public class DeviceEntity {
         updateSensorData(attributes);
         this.sensorOnTime = getSensorOnTime(this.sensorsData);
 
+        var sensorsLast = new HashMap<>(this.sensorOnTime);
+
+        this.sensor = cleanSensor(sensorsLast);
+
         log.debug("Sensor raw actualizado: {}", this.sensorRaw);
         // Aplicar la sobreescritura de sensores si existe una configuración
         log.debug("Sensor data recibido de bd antes de sobreescritura: {}", sensorsData);
         Optional.ofNullable(this.overrideSensors)
                 .ifPresent(
-                        override -> {
-                            var sensorsLast = new HashMap<>(this.sensorOnTime);
-                            Map<String, Object> executeSensor = override.executeJexlScript(sensorsLast);
+                    override -> {
+                        Map<String, Object> executeSensor = override.executeJexlScript(sensorsLast);
                             Map<String, Object> mapCleanSensor = cleanSensor(executeSensor);
                             this.sensor = mapCleanSensor;
                             updateSensorData(mapCleanSensor);

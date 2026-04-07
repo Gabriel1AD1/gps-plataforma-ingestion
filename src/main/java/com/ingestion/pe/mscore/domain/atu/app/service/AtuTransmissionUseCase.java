@@ -96,9 +96,11 @@ public class AtuTransmissionUseCase {
                     .flatMap(vId -> routeConfigClient.getVehiclePlate(vId))
                     .orElse("UNKNOWN");
 
-            String driverDoi = Optional.ofNullable(tripState.getDriverId())
-                    .flatMap(driverDataPort::getDriverDocumentNumber)
-                    .orElse(DEFAULT_DRIVER_DOI);
+            String driverDoi = Optional.ofNullable(tripState.getDriverDocumentNumber())
+                    .filter(doi -> !doi.isBlank())
+                    .orElseGet(() -> Optional.ofNullable(tripState.getDriverId())
+                            .flatMap(driverDataPort::getDriverDocumentNumber)
+                            .orElse(DEFAULT_DRIVER_DOI));
 
             String identifier = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
 
@@ -137,6 +139,10 @@ public class AtuTransmissionUseCase {
     }
 
     private String resolveRouteId(TripState tripState) {
+        if (tripState.getAtuRouteCode() != null && !tripState.getAtuRouteCode().isBlank()) {
+            return tripState.getAtuRouteCode();
+        }
+
         return Optional.ofNullable(tripState.getRouteId())
                 .flatMap(routeConfigClient::getRouteConfig)
                 .map(config -> config.getAtuRouteCode() != null

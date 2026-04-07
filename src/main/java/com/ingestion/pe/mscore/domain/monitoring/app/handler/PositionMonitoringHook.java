@@ -50,6 +50,7 @@ public class PositionMonitoringHook {
 
                 Optional<TripActiveResponse> tripOpt = routeConfigClient.getActiveTrip(activeTripIdOpt.get());
                 if (tripOpt.isEmpty()) {
+                    routeConfigClient.evictActiveTripIdForVehicle(vehicleIdOpt.get());
                     return;
                 }
 
@@ -132,7 +133,10 @@ public class PositionMonitoringHook {
                 .tripId(trip.getId())
                 .routeId(trip.getRouteId())
                 .vehicleId(trip.getVehicleId())
+                .companyId(trip.getCompanyId())
                 .driverId(trip.getDriverId())
+                .driverDocumentNumber(trip.getDriverDocumentNumber())
+                .atuRouteCode(trip.getAtuRouteCode())
                 .direction(trip.getDirection())
                 .currentPointIndex(0)
                 .accumulatedDistanceKm(0.0)
@@ -226,6 +230,7 @@ public class PositionMonitoringHook {
                     .broadcast(true)
                     .messageAgregateType(WebsocketMessage.MessageAgregateType.TRIP_STATE_UPDATE)
                     .messageType(WebsocketMessage.MessageType.REFRESH)
+                    .companyId(state.getCompanyId())
                     .properties(properties)
                     .build();
 

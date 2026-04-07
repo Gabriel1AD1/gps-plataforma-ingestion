@@ -61,7 +61,13 @@ public class TrackingProcessorService {
 
             List<Long> geofenceIds;
             if (idsObj instanceof List<?>) {
-                geofenceIds = ((List<?>) idsObj).stream()
+                List<?> rawList = (List<?>) idsObj;
+                if (!rawList.isEmpty() && "-1".equals(rawList.get(0).toString())) {
+                    log.debug("Geocercas vacías detectadas en caché negativo ([-1L]) para companyId={}. Saltando Fallback a PostgreSQL.", companyId);
+                    return;
+                }
+                
+                geofenceIds = rawList.stream()
                         .filter(Objects::nonNull)
                         .map(obj -> Long.parseLong(obj.toString()))
                         .collect(Collectors.toList());
@@ -72,9 +78,13 @@ public class TrackingProcessorService {
                         .stream()
                         .map(GeofenceReadEntity::getId)
                         .collect(Collectors.toList());
+                
                 if (geofenceIds.isEmpty()) {
                     log.debug("No se encontraron geocercas activas para companyId={}", companyId);
+                    redisTemplate.opsForValue().set(companyGeofencesKey, java.util.Collections.singletonList(-1L), java.time.Duration.ofSeconds(600));
                     return;
+                } else {
+                    redisTemplate.opsForValue().set(companyGeofencesKey, geofenceIds, java.time.Duration.ofSeconds(600));
                 }
             } else {
                 log.warn("Tipo inesperado para geocercas de la empresa en Redis: {}", idsObj.getClass());
@@ -117,7 +127,7 @@ public class TrackingProcessorService {
         GeofenceReadEntity entity = entityOpt.get();
         GeofenceResponse response = toGeofenceResponse(entity);
 
-        vehicleGeofenceEntityRepository.findFirstByGeofenceId(geofenceId)
+        vehicleGeofenceEntityRepository.findFirstByGeofenceIdAndActiveTrueOrderByIdAsc(geofenceId)
                 .ifPresent(vg -> response.setVehicleId(vg.getVehicleId()));
 
         geofenceCacheDao.save(geofenceKey, response, GEOFENCE_CACHE_TTL_SECONDS);
@@ -193,7 +203,7 @@ public class TrackingProcessorService {
                     .orElse(null);
         } else {
             geofenceConfig = vehicleGeofenceEntityRepository
-                    .findFirstByGeofenceId(geofence.getId())
+                    .findFirstByGeofenceIdAndActiveTrueOrderByIdAsc(geofence.getId())
                     .orElse(null);
         }
         if (geofenceConfig == null) {

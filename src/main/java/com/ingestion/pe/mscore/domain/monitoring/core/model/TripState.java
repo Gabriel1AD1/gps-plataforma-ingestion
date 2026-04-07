@@ -17,7 +17,11 @@ public class TripState implements Serializable {
     private Long tripId;
     private Long routeId;
     private Long vehicleId;
+    private Long companyId;
     private Long driverId;
+    private String driverFullName;
+    private String driverDocumentNumber;
+    private String atuRouteCode;
     private String direction;
 
     // Progreso en la ruta

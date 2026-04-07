@@ -67,7 +67,7 @@ public class WebsocketMessage {
         FLEET_SUMMARY,
         SUMMARY_DEVICE,
         EVENTS_CREATED,
-        VEHICLE_UPDATE, TRIP_STATE_UPDATE, UNDEFINED
+        VEHICLE_UPDATE, TRIP_STATE_UPDATE, MONITORING_REFRESH, UNDEFINED
     }
 
     public enum MessageType {

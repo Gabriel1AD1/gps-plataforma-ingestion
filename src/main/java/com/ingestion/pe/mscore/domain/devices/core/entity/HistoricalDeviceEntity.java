@@ -72,6 +72,11 @@ public class HistoricalDeviceEntity {
     @Builder.Default
     private Map<String, Object> attributes = new LinkedHashMap<>();
 
+    @Convert(converter = MapConverter.class)
+    @Column(name = "sensors_raw", columnDefinition = "TEXT")
+    @Builder.Default
+    private Map<String, Object> sensorsRaw = Map.of();
+
     public static HistoricalDeviceEntity map(Position position, DeviceEntity device) {
         HistoricalDeviceEntity historicalDeviceEntity = new HistoricalDeviceEntity();
 
@@ -95,6 +100,7 @@ public class HistoricalDeviceEntity {
         historicalDeviceEntity.setCourse(position.getCourse());
         historicalDeviceEntity.setAddress(position.getAddress());
         historicalDeviceEntity.setAccuracy(position.getAccuracy());
+        historicalDeviceEntity.setSensorsRaw(position.getAttributes());
         historicalDeviceEntity.setAttributes(device.getSensor());
         return historicalDeviceEntity;
     }

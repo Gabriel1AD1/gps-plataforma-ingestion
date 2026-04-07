@@ -24,4 +24,7 @@ public class TripActiveResponse implements Serializable {
     private Instant dispatchTime;
     private Long departureTerminalId;
     private Long arrivalTerminalId;
+    private String driverFullName;
+    private String driverDocumentNumber;
+    private String atuRouteCode;
 }

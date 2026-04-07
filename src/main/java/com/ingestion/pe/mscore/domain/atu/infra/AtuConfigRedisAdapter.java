@@ -25,19 +25,33 @@ public class AtuConfigRedisAdapter implements AtuConfigPort {
         try {
             Optional<AtuTokenCache> cached = cacheDao.get(key, AtuTokenCache.class);
             if (cached.isPresent()) {
+                AtuTokenCache token = cached.get();
+                if ("EMPTY_CACHE".equals(token.getToken())) {
+                    log.debug("Caché negativo explícito detectado para Token ATU (companyId={}). Saltando Fallback a DB.", companyId);
+                    return Optional.empty();
+                }
                 return cached;
             }
             
             log.warn("[REDIS] Token ATU para companyId={} no encontrado en cache. Fallback a DB.", companyId);
-            return atuTokenReadEntityRepository.findByCompanyId(companyId)
-                    .map(entity -> {
-                        AtuTokenCache cache = AtuTokenCache.builder()
-                                .token(entity.getToken())
-                                .endpoint(entity.getEndpoint())
-                                .build();
-                        cacheDao.save(key, cache, 3600);
-                        return cache;
-                    });
+            Optional<com.ingestion.pe.mscore.domain.atu.core.entity.AtuTokenReadEntity> entityOpt = atuTokenReadEntityRepository.findByCompanyId(companyId);
+            
+            if (entityOpt.isPresent()) {
+                com.ingestion.pe.mscore.domain.atu.core.entity.AtuTokenReadEntity entity = entityOpt.get();
+                AtuTokenCache cache = AtuTokenCache.builder()
+                        .token(entity.getToken())
+                        .endpoint(entity.getEndpoint())
+                        .build();
+                cacheDao.save(key, cache, 3600);
+                return Optional.of(cache);
+            } else {
+                AtuTokenCache emptyCache = AtuTokenCache.builder()
+                        .token("EMPTY_CACHE")
+                        .endpoint("")
+                        .build();
+                cacheDao.save(key, emptyCache, 3600);
+                return Optional.empty();
+            }
             
         } catch (Exception e) {
             log.error("Error leyendo config ATU para companyId={} (Fallback intentado): {}", companyId, e.getMessage());

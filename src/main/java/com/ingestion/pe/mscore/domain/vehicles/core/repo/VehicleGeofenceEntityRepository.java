@@ -16,6 +16,6 @@ public interface VehicleGeofenceEntityRepository extends JpaRepository<VehicleGe
             @Param("vehicleId") Long vehicleId,
             @Param("geofenceId") Long geofenceId);
 
-    @Query("SELECT vg FROM VehicleGeofenceEntity vg WHERE vg.geofenceId = :geofenceId AND vg.active = true ORDER BY vg.id ASC")
-    Optional<VehicleGeofenceEntity> findFirstByGeofenceId(@Param("geofenceId") Long geofenceId);
+    Optional<VehicleGeofenceEntity> findFirstByGeofenceIdAndActiveTrueOrderByIdAsc(Long geofenceId);
 }
+

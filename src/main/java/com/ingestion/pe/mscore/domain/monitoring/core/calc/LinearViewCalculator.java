@@ -97,6 +97,7 @@ public class LinearViewCalculator {
         }
 
         double totalAcumulado = baseDistance + segmentDistance;
+        state.setAccumulatedDistanceKm(totalAcumulado);
         double progress = (totalAcumulado / totalDistance) * 100.0;
 
         return Math.max(0.0, Math.min(100.0, progress));
