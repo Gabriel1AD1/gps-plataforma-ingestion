@@ -15,6 +15,7 @@ public class DeviceResponse {
     private Long id;
     private String imei;
     private String serialNumber;
+    private String iccid;
     private String password;
     private String model;
     private Long companyId;

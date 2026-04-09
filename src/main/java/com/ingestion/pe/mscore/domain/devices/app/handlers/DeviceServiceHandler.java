@@ -12,6 +12,7 @@ import com.ingestion.pe.mscore.commons.models.Position;
 import com.ingestion.pe.mscore.commons.models.WebsocketMessage;
 import com.ingestion.pe.mscore.domain.devices.app.factory.DeviceApplicationEventFactory;
 import com.ingestion.pe.mscore.domain.devices.app.manager.ManagerConfigAlert;
+import com.ingestion.pe.mscore.domain.vehicles.app.manager.VehicleTrackingPublishService;
 import com.ingestion.pe.mscore.domain.devices.core.entity.DeviceConfigAlertsEntity;
 import com.ingestion.pe.mscore.domain.devices.core.entity.DeviceEntity;
 import com.ingestion.pe.mscore.domain.devices.core.entity.HistoricalDeviceEntity;
@@ -47,6 +48,7 @@ public class DeviceServiceHandler {
         private final com.ingestion.pe.mscore.domain.atu.app.dispatcher.AtuTransmissionAsyncDispatcher atuTransmissionAsyncDispatcher;
         private final EventEntityRepository eventEntityRepository;
         private final EventResolver eventResolver;
+        private final VehicleTrackingPublishService vehicleTrackingPublishService;
 
         @Transactional
         public void handleDeviceEvent(Position position) {
@@ -131,6 +133,8 @@ public class DeviceServiceHandler {
                                                                 : Instant.now());
 
                                 atuTransmissionAsyncDispatcher.dispatchAsync(position, device.getId(), company);
+
+                                vehicleTrackingPublishService.processPositionForVehicle(position, device);
 
                         } catch (Exception e) {
                                 log.error("Error procesando evento de dispositivo: {}", e.getMessage(), e);
