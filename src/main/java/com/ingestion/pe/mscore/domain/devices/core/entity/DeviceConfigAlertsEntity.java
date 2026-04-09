@@ -55,9 +55,6 @@ public class DeviceConfigAlertsEntity {
     @CreationTimestamp
     private Instant created;
 
-    @UpdateTimestamp
-    private Instant updated;
-
     public void activate() {
         this.active = true;
         this.sendEventAt = Instant.now();
