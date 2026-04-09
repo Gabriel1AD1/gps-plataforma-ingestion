@@ -32,7 +32,7 @@ public class DeviceConfigAlertsEntity {
     @JoinColumn(name = "config_alerts_id")
     private ConfigAlertsEntity configAlerts;
 
-    @Column(name = "is_active", nullable = false)
+    @Column(name = "active", nullable = false)
     @Comment("Indica si la alerta está activa")
     private boolean isActive;
 
