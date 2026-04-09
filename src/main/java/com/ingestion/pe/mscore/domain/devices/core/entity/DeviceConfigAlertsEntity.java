@@ -11,7 +11,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "device_config_alerts", schema = "devices_module")
+@Table(name = "device_config_alert", schema = "devices_module")
 @Getter
 @Setter
 @RequiredArgsConstructor
