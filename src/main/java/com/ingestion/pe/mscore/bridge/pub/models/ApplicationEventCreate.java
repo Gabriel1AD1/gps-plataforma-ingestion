@@ -5,7 +5,7 @@ import com.ingestion.pe.mscore.bridge.pub.models.enums.ModuleName;
 import com.ingestion.pe.mscore.commons.libs.utils.JsonUtils;
 import com.ingestion.pe.mscore.commons.models.enums.EventTypeEnumerated;
 import com.ingestion.pe.mscore.commons.models.enums.SeverityStatus;
-import com.ingestion.pe.mscore.domain.auth.core.enums.NotificationTypes;
+import com.ingestion.pe.mscore.commons.models.enums.NotificationTypes;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Set;

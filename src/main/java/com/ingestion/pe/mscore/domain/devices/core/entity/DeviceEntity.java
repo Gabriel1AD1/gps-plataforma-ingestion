@@ -8,6 +8,7 @@ import com.ingestion.pe.mscore.commons.models.enums.EntityStatus;
 import com.ingestion.pe.mscore.domain.devices.core.converter.DeviceStatusConverter;
 import com.ingestion.pe.mscore.domain.devices.core.converter.DeviceTypeConverter;
 import com.ingestion.pe.mscore.domain.devices.core.converter.SensorModelConverter;
+import com.ingestion.pe.mscore.domain.devices.core.entity.OverrideSensorsEntity;
 import com.ingestion.pe.mscore.domain.devices.core.enums.DeviceStatus;
 import com.ingestion.pe.mscore.domain.devices.core.enums.DeviceType;
 import com.ingestion.pe.mscore.domain.devices.core.models.SensorModel;
@@ -43,6 +44,10 @@ public class DeviceEntity {
     @Column(nullable = false, unique = true, length = 50)
     @Comment("Número de serie del dispositivo")
     private String serialNumber;
+
+    @Column(nullable = false, length = 250)
+    @Comment("ICCID del dispositivo")
+    private String iccid;
 
     @Column(name = "speed_in_km")
     @Comment("Velocidad en nudos")
@@ -173,6 +178,9 @@ public class DeviceEntity {
      * )
      * private OverrideSensorsEntity overrideSensors;
      */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "override_sensors_id")
+    private OverrideSensorsEntity overrideSensors;
     @Column(name = "last_historical_device_id")
     @Comment("Último registro histórico asociado al dispositivo")
     private Long lastHistoricalDevice;
@@ -219,6 +227,7 @@ public class DeviceEntity {
         this.status = EntityStatus.ACTIVE;
         this.deviceStatus = DeviceStatus.offline;
         this.imei = Objects.requireNonNullElse(this.imei, "unknown-imei");
+        this.iccid = Objects.requireNonNullElse(this.iccid, "unknown-iccid");
         this.lastConnection = Instant.now();
         this.lastDisconnection = Instant.now();
         this.lastDataReceived = Instant.now();
@@ -246,31 +255,22 @@ public class DeviceEntity {
         updateSensorData(attributes);
         this.sensorOnTime = getSensorOnTime(this.sensorsData);
 
-        log.debug("Sensor raw actualizado: {}", this.sensorRaw);
-        // Aplicar la sobreescritura de sensores si existe una configuración
-        log.debug("Sensor data recibido de bd antes de sobreescritura: {}", sensorsData);
         var sensorsLast = new HashMap<>(this.sensorOnTime);
 
         this.sensor = cleanSensor(sensorsLast);
 
-        /*
-         * Optional.ofNullable(this.overrideSensors)
-         * .ifPresent(
-         * override -> {
-         * log.debug("Aplicando sensores data {}", sensorsData);
-         * // newData (sensorRaw) es la fuente de verdad
-         * log.debug("Sensores combinados para sobreescritura: {}", sensorsLast);
-         * 
-         * // Ejecutar el script JEXL para obtener los sensores sobreescritos
-         * // Actualizar el mapa de sensores con los valores sobreescritos
-         * // No incluir los tiempos en el sensor con tiempo
-         * Map<String, Object> executeSensor = override.executeJexlScript(sensorsLast);
-         * Map<String, Object> cleanSensor = cleanSensor(executeSensor);
-         * this.sensor = cleanSensor;
-         * updateSensorData(cleanSensor);
-         * this.sensorOnTime = getSensorOnTime(this.sensorsData);
-         * });
-         */
+        log.debug("Sensor raw actualizado: {}", this.sensorRaw);
+        // Aplicar la sobreescritura de sensores si existe una configuración
+        log.debug("Sensor data recibido de bd antes de sobreescritura: {}", sensorsData);
+        Optional.ofNullable(this.overrideSensors)
+                .ifPresent(
+                    override -> {
+                        Map<String, Object> executeSensor = override.executeJexlScript(sensorsLast);
+                            Map<String, Object> mapCleanSensor = cleanSensor(executeSensor);
+                            this.sensor = mapCleanSensor;
+                            updateSensorData(mapCleanSensor);
+                            this.sensorOnTime = getSensorOnTime(this.sensorsData);
+                        });
 
         if (this.dataHistory.size() >= 50) {
             // elimina el primero (el más antiguo)

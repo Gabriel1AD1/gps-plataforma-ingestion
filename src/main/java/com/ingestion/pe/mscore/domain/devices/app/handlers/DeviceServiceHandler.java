@@ -2,29 +2,28 @@ package com.ingestion.pe.mscore.domain.devices.app.handlers;
 
 import static com.ingestion.pe.mscore.domain.devices.app.factory.DeviceWebsocketMessageRefreshFactory.newDeviceUpdate;
 
-import com.ingestion.pe.mscore.bridge.pub.models.DevicePositionEventCreate;
-import com.ingestion.pe.mscore.bridge.pub.models.ResolvedApplicationEvent;
-import com.ingestion.pe.mscore.bridge.pub.service.EventCreateBridgeService;
 import com.ingestion.pe.mscore.bridge.pub.service.KafkaPublisherService;
 import com.ingestion.pe.mscore.clients.VehicleClient;
 import com.ingestion.pe.mscore.clients.cache.store.DeviceCacheStore;
+import com.ingestion.pe.mscore.domain.devices.app.resolver.EventResolver;
 import com.ingestion.pe.mscore.clients.models.VehicleResponse;
 import com.ingestion.pe.mscore.config.cache.store.RedisPositionStore;
 import com.ingestion.pe.mscore.commons.models.Position;
 import com.ingestion.pe.mscore.commons.models.WebsocketMessage;
 import com.ingestion.pe.mscore.domain.devices.app.factory.DeviceApplicationEventFactory;
 import com.ingestion.pe.mscore.domain.devices.app.manager.ManagerConfigAlert;
+import com.ingestion.pe.mscore.domain.vehicles.app.manager.VehicleTrackingPublishService;
 import com.ingestion.pe.mscore.domain.devices.core.entity.DeviceConfigAlertsEntity;
 import com.ingestion.pe.mscore.domain.devices.core.entity.DeviceEntity;
 import com.ingestion.pe.mscore.domain.devices.core.entity.HistoricalDeviceEntity;
-import com.ingestion.pe.mscore.domain.devices.core.models.SensorModel;
 import com.ingestion.pe.mscore.domain.devices.core.repo.DeviceConfigAlertsEntityRepository;
 import com.ingestion.pe.mscore.domain.devices.core.repo.DeviceEntityRepository;
 import com.ingestion.pe.mscore.domain.devices.core.repo.HistoricalDeviceEntityRepository;
 import com.ingestion.pe.mscore.domain.devices.core.repo.UserDeviceEntityRepository;
+import com.ingestion.pe.mscore.domain.devices.core.repo.EventEntityRepository;
+import com.ingestion.pe.mscore.domain.devices.core.entity.EventEntity;
 import java.time.Instant;
 import java.util.*;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -39,12 +38,17 @@ public class DeviceServiceHandler {
         private final KafkaPublisherService kafkaPublisherService;
         private final HistoricalDeviceEntityRepository historicalDeviceEntityRepository;
         private final DeviceConfigAlertsEntityRepository deviceConfigAlertsEntityRepository;
-        private final EventCreateBridgeService eventCreateBridgeService;
+        // private final EventCreateBridgeService eventCreateBridgeService;
         private final ManagerConfigAlert managerConfigAlert;
         private final VehicleClient vehicleClient;
         private final DeviceCacheStore deviceCacheStore;
         private final com.ingestion.pe.mscore.applications.tracking.TrackingProcessorService trackingProcessorService;
         private final RedisPositionStore redisPositionStore;
+        private final PositionMonitoringAsyncDispatcher positionMonitoringAsyncDispatcher;
+        private final com.ingestion.pe.mscore.domain.atu.app.dispatcher.AtuTransmissionAsyncDispatcher atuTransmissionAsyncDispatcher;
+        private final EventEntityRepository eventEntityRepository;
+        private final EventResolver eventResolver;
+        private final VehicleTrackingPublishService vehicleTrackingPublishService;
 
         @Transactional
         public void handleDeviceEvent(Position position) {
@@ -99,30 +103,38 @@ public class DeviceServiceHandler {
                                 Set<DeviceConfigAlertsEntity> configAlertsEntities = managerConfigAlert
                                                 .executeConfigAlertRules(device.getId(), attributes);
 
-                                markConfigResolved(configAlertsEntities, attributes);
+                                markConfigResolved(device, configAlertsEntities, attributes);
                                 markConfigNotResolved(device, configAlertsEntities, usersNotSendPositions, company);
 
                                 deviceConfigAlertsEntityRepository.saveAll(configAlertsEntities);
 
                                 sendNewPosition(device, historicalSave, company);
-                                Set<Map<String, Object>> sensorData = device.getSensorsData()
-                                                .stream()
-                                                .map(SensorModel::toMap)
-                                                .collect(Collectors.toSet());
 
-                                eventCreateBridgeService.createEvent(
-                                                DevicePositionEventCreate.builder()
-                                                                .deviceId(device.getId())
-                                                                .deviceTime(position.getDeviceTime() != null
-                                                                                ? position.getDeviceTime().toInstant()
-                                                                                : Instant.now())
-                                                                .imei(device.getImei())
-                                                                .sensors(device.getSensor())
-                                                                .sensorData(sensorData)
-                                                                .position(position)
-                                                                .build());
-
+                                // eventCreateBridgeService.createEvent(
+                                // DevicePositionEventCreate.builder()
+                                // .deviceId(device.getId())
+                                // .deviceTime(position.getDeviceTime() != null
+                                // ? position.getDeviceTime().toInstant()
+                                // : Instant.now())
+                                // .imei(device.getImei())
+                                // .sensors(device.getSensor())
+                                // .sensorData(sensorData)
+                                // .position(position)
+                                // .build());
                                 saveInCache(device);
+
+                                positionMonitoringAsyncDispatcher.dispatchAsync(
+                                                device.getId(),
+                                                position.getLatitude(),
+                                                position.getLongitude(),
+                                                position.getSpeedInKm(),
+                                                position.getDeviceTime() != null
+                                                                ? position.getDeviceTime().toInstant()
+                                                                : Instant.now());
+
+                                atuTransmissionAsyncDispatcher.dispatchAsync(position, device.getId(), company);
+
+                                vehicleTrackingPublishService.processPositionForVehicle(position, device);
 
                         } catch (Exception e) {
                                 log.error("Error procesando evento de dispositivo: {}", e.getMessage(), e);
@@ -150,6 +162,7 @@ public class DeviceServiceHandler {
          * @param attributes           Atributos del dispositivo
          */
         private void markConfigResolved(
+                        DeviceEntity device,
                         Set<DeviceConfigAlertsEntity> configAlertsEntities, Map<String, Object> attributes) {
                 configAlertsEntities.stream()
                                 .filter(deactivatedAlert -> !deactivatedAlert.isActive())
@@ -158,20 +171,23 @@ public class DeviceServiceHandler {
                                                         String resolutionNotes = "Configuracion de alerta con titulo ["
                                                                         + deactivatedAlert.getConfigAlerts().getTitle()
                                                                         + "] Ya no se encuentra activa";
-                                                        eventCreateBridgeService.createEvent(
-                                                                        ResolvedApplicationEvent.builder()
-                                                                                        .eventId(deactivatedAlert
-                                                                                                        .getEventId() != null
-                                                                                                                        ? deactivatedAlert
-                                                                                                                                        .getEventId()
-                                                                                                                                        .toString()
-                                                                                                                        : null)
-                                                                                        .resolutionNotes(
-                                                                                                        resolutionNotes)
-                                                                                        .resolution(true)
-                                                                                        .resolutionProperties(
-                                                                                                        attributes)
-                                                                                        .build());
+                                                        if (deactivatedAlert.getEventId() != null) {
+                                                                eventEntityRepository
+                                                                                .findTopByAggregateIdAndEventTypeAndResolvedFalseOrderByOccurredAtDesc(
+                                                                                                device.getId().toString(),
+                                                                                                deactivatedAlert.getConfigAlerts()
+                                                                                                                .getTitle())
+                                                                                .ifPresent(existingEvent -> {
+                                                                                        existingEvent.markIsResolved(
+                                                                                                        resolutionNotes,
+                                                                                                        attributes);
+                                                                                        eventEntityRepository.save(
+                                                                                                        existingEvent);
+                                                                                        eventResolver.resolveEvent(
+                                                                                                        existingEvent);
+                                                                                });
+                                                        }
+
                                                         deactivatedAlert.markAsResolved();
                                                 });
         }
@@ -201,13 +217,15 @@ public class DeviceServiceHandler {
                         Set<DeviceConfigAlertsEntity> configAlertsEntities,
                         Set<UUID> usersNotSendPositions,
                         Long companyId) {
+                List<VehicleResponse> vehicleAsociateForDevice = configAlertsEntities.stream()
+                                .anyMatch(DeviceConfigAlertsEntity::isActive)
+                                                ? vehicleClient.getVehiclesByIds(List.of(device.getId()))
+                                                : List.of();
+
                 configAlertsEntities.stream()
                                 .filter(DeviceConfigAlertsEntity::isActive)
                                 .forEach(
                                                 triggeredAlertsFor -> {
-                                                        List<VehicleResponse> vehicleAsociateForDevice = vehicleClient
-                                                                        .getVehiclesByIds(List.of(device.getId()));
-
                                                         log.info(
                                                                         "Alerta de configuración activada para el dispositivo IMEI: {}. Alerta: {}",
                                                                         device.getImei(),
@@ -220,8 +238,15 @@ public class DeviceServiceHandler {
                                                                                         companyId,
                                                                                         triggeredAlertsFor,
                                                                                         vehicleAsociateForDevice);
+
+                                                        EventEntity eventEntity = EventEntity.map(event);
+                                                        eventEntity = eventEntityRepository.save(eventEntity);
+
+                                                        triggeredAlertsFor.setEventId(
+                                                                        UUID.fromString(eventEntity.getEventId()));
                                                         triggeredAlertsFor.setSendEventAt(Instant.now());
-                                                        eventCreateBridgeService.createEvent(event);
+
+                                                        eventResolver.resolveEvent(eventEntity);
                                                 });
         }
 }

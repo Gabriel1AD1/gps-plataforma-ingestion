@@ -12,6 +12,9 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class ManagerConfigAlert {
 
+    // Repositorio Redis de reglas de alerta
+    private final CacheRepository cacheRepository;
+
     // Repositorio que mantiene el estado runtime de las alertas
     // (contador de true/false, activo/inactivo, etc.)
     // Este estado NO es persistencia de negocio, es estado operativo
@@ -36,7 +39,7 @@ public class ManagerConfigAlert {
 
         // Obtiene todas las configuraciones de alertas asociadas al dispositivo desde
         // cache
-        var configsAlerts = CacheRepository.get(deviceId);
+        var configsAlerts = cacheRepository.get(deviceId);
 
         // Itera cada relación dispositivo <-> configuración de alerta
         for (DeviceConfigAlertsEntity relation : configsAlerts) {

@@ -22,7 +22,8 @@ public final class DeviceWebsocketMessageRefreshFactory {
                                                 "status",
                                                 device.getDeviceStatus().name(),
                                                 "updateAt",
-                                                Instant.now().toString()));
+                                                Instant.now().toString()),
+                                device.getCompany());
         }
 
         public static WebsocketMessage newDeviceUpdate(
@@ -47,7 +48,8 @@ public final class DeviceWebsocketMessageRefreshFactory {
                 return refresh(
                                 "DEVICE_UPDATE",
                                 "Nueva posición registrada",
-                                attributes);
+                                attributes,
+                                companyId);
         }
 
         public static WebsocketMessage newSummaryDevice(
@@ -66,7 +68,8 @@ public final class DeviceWebsocketMessageRefreshFactory {
                 return refresh(
                                 "SUMMARY_DEVICE",
                                 "Resumen de dispositivos actualizado",
-                                attributes);
+                                attributes,
+                                companyId);
         }
 
 
@@ -74,11 +77,13 @@ public final class DeviceWebsocketMessageRefreshFactory {
         private static WebsocketMessage refresh(
                         String type,
                         String message,
-                        Map<String, Object> properties) {
+                        Map<String, Object> properties,
+                        Long companyId) {
 
                 return WebsocketMessage.refreshBuilder()
                                 .message(message)
                                 .properties(properties)
+                                .companyId(companyId)
                                 .messageAgregateType(WebsocketMessage.MessageAgregateType.valueOf(type))
                                 .build();
         }
