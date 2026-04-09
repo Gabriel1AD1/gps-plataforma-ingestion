@@ -58,6 +58,7 @@ public class DeviceCacheStore {
                 entity.getId(),
                 entity.getImei(),
                 entity.getSerialNumber(),
+                entity.getIccid(),
                 entity.getPassword(),
                 entity.getModel(),
                 entity.getCompany(),

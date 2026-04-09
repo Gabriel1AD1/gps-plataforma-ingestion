@@ -45,6 +45,10 @@ public class DeviceEntity {
     @Comment("Número de serie del dispositivo")
     private String serialNumber;
 
+    @Column(nullable = false, length = 250)
+    @Comment("ICCID del dispositivo")
+    private String iccid;
+
     @Column(name = "speed_in_km")
     @Comment("Velocidad en nudos")
     @ColumnDefault("0")
@@ -223,6 +227,7 @@ public class DeviceEntity {
         this.status = EntityStatus.ACTIVE;
         this.deviceStatus = DeviceStatus.offline;
         this.imei = Objects.requireNonNullElse(this.imei, "unknown-imei");
+        this.iccid = Objects.requireNonNullElse(this.iccid, "unknown-iccid");
         this.lastConnection = Instant.now();
         this.lastDisconnection = Instant.now();
         this.lastDataReceived = Instant.now();
