@@ -36,46 +36,61 @@ public class RelativeDistanceCalculator {
             return results;
         }
 
+        if (routeConfig != null && "CIRCULAR".equalsIgnoreCase(routeConfig.getType())) {
+            for (TripState ts : tripStates) {
+                if (!"LOOP".equalsIgnoreCase(ts.getDirection())) {
+                    ts.setDirection("LOOP");
+                }
+            }
+        }
+
         List<ControlPointModel> controlPoints = routeConfig != null ? routeConfig.getControlPoints() : null;
         Map<String, Double> matrixMap = buildMatrixMap(routeConfig);
 
-        List<TripState> sorted = tripStates.stream()
-                .filter(s -> s.getAccumulatedDistanceKm() != null)
-                .sorted(Comparator.comparingDouble(TripState::getAccumulatedDistanceKm).reversed())
-                .toList();
+        Map<String, List<TripState>> groupedStates = new HashMap<>();
+        for (TripState ts : tripStates) {
+            String dir = ts.getDirection() != null ? ts.getDirection() : "UNKNOWN";
+            groupedStates.computeIfAbsent(dir, k -> new ArrayList<>()).add(ts);
+        }
 
-        for (int i = 0; i < sorted.size(); i++) {
-            TripState current = sorted.get(i);
+        for (List<TripState> directionGroup : groupedStates.values()) {
+            List<TripState> sorted = directionGroup.stream()
+                    .filter(s -> s.getAccumulatedDistanceKm() != null)
+                    .sorted(Comparator.comparingDouble(TripState::getAccumulatedDistanceKm).reversed())
+                    .toList();
 
-            String cpName = resolveControlPointName(current.getCurrentPointIndex(), controlPoints);
+            for (int i = 0; i < sorted.size(); i++) {
+                TripState current = sorted.get(i);
+                String cpName = resolveControlPointName(current.getCurrentPointIndex(), controlPoints);
 
-            DateroResult.DateroResultBuilder builder = DateroResult.builder()
-                    .tripId(current.getTripId())
-                    .vehicleId(current.getVehicleId())
-                    .driverId(current.getDriverId())
-                    .rank(i + 1)
-                    .currentPointIndex(current.getCurrentPointIndex())
-                    .currentControlPointName(cpName);
+                DateroResult.DateroResultBuilder builder = DateroResult.builder()
+                        .tripId(current.getTripId())
+                        .vehicleId(current.getVehicleId())
+                        .driverId(current.getDriverId())
+                        .rank(i + 1)
+                        .currentPointIndex(current.getCurrentPointIndex())
+                        .currentControlPointName(cpName);
 
-            if (i > 0) {
-                TripState ahead = sorted.get(i - 1);
-                double deltaMin = estimateDeltaMinutes(current, ahead, controlPoints, matrixMap);
-                double deltaKm = ahead.getAccumulatedDistanceKm() - current.getAccumulatedDistanceKm();
-                builder.aheadVehicleId(ahead.getVehicleId())
-                        .aheadDeltaKm(Math.round(deltaKm * 100.0) / 100.0)
-                        .aheadDeltaMinutes(Math.round(deltaMin * 10.0) / 10.0);
+                if (i > 0) {
+                    TripState ahead = sorted.get(i - 1);
+                    double deltaMin = estimateDeltaMinutes(current, ahead, controlPoints, matrixMap);
+                    double deltaKm = ahead.getAccumulatedDistanceKm() - current.getAccumulatedDistanceKm();
+                    builder.aheadVehicleId(ahead.getVehicleId())
+                            .aheadDeltaKm(Math.round(deltaKm * 100.0) / 100.0)
+                            .aheadDeltaMinutes(Math.round(deltaMin * 10.0) / 10.0);
+                }
+
+                if (i < sorted.size() - 1) {
+                    TripState behind = sorted.get(i + 1);
+                    double deltaMin = estimateDeltaMinutes(behind, current, controlPoints, matrixMap);
+                    double deltaKm = current.getAccumulatedDistanceKm() - behind.getAccumulatedDistanceKm();
+                    builder.behindVehicleId(behind.getVehicleId())
+                            .behindDeltaKm(Math.round(deltaKm * 100.0) / 100.0)
+                            .behindDeltaMinutes(Math.round(deltaMin * 10.0) / 10.0);
+                }
+
+                results.add(builder.build());
             }
-
-            if (i < sorted.size() - 1) {
-                TripState behind = sorted.get(i + 1);
-                double deltaMin = estimateDeltaMinutes(behind, current, controlPoints, matrixMap);
-                double deltaKm = current.getAccumulatedDistanceKm() - behind.getAccumulatedDistanceKm();
-                builder.behindVehicleId(behind.getVehicleId())
-                        .behindDeltaKm(Math.round(deltaKm * 100.0) / 100.0)
-                        .behindDeltaMinutes(Math.round(deltaMin * 10.0) / 10.0);
-            }
-
-            results.add(builder.build());
         }
 
         return results;

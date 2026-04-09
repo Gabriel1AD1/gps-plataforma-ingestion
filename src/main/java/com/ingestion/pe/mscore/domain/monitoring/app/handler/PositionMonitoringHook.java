@@ -71,6 +71,11 @@ public class PositionMonitoringHook {
             }
 
             RouteConfigResponse config = configOpt.get();
+
+            if ("CIRCULAR".equalsIgnoreCase(config.getType()) && !"LOOP".equalsIgnoreCase(state.getDirection())) {
+                state.setDirection("LOOP");
+            }
+
             List<ControlPointModel> controlPoints = config.getControlPoints();
 
             if (controlPoints == null || controlPoints.isEmpty()) {
