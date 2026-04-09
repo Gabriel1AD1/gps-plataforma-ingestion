@@ -2,12 +2,14 @@ package com.ingestion.pe.mscore.domain.devices.core.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import jakarta.persistence.Table;
+
 import java.time.Instant;
 import java.util.UUID;
 import lombok.*;
 import org.hibernate.annotations.Comment;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
@@ -23,30 +25,32 @@ public class DeviceConfigAlertsEntity {
     @Column(nullable = false)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @JoinColumn(name = "device_id")
     @JsonIgnore
     private DeviceEntity device;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @JoinColumn(name = "config_alerts_id")
     private ConfigAlertsEntity configAlerts;
 
-    @Column(name = "active", nullable = false)
+    @Column(name = "active")
     @Comment("Indica si la alerta está activa")
-    private boolean isActive;
+    private Boolean active;
 
-    @Column(name = "current_count_match", nullable = false)
-    @Comment("Conteo actual de coincidencias")
-    private Long currentCountMatch;
-
-    @Column(name = "last_match_at")
-    @Comment("Fecha de la última coincidencia")
-    private Instant lastMatchAt;
+    @Column(name = "event_id")
+    @Comment("Id único del evento asociado a la configuración de alerta en formato UUID")
+    private String eventId;
 
     @Column(name = "send_event_at")
-    @Comment("Fecha del último evento enviado")
+    @Comment("Fecha y hora en que se envió el evento de alerta")
     private Instant sendEventAt;
+
+    @Column(name = "activation_date")
+    @Comment("Fecha de activación de la configuración de alerta para el dispositivo")
+    private Instant activationDate;
 
     @CreationTimestamp
     private Instant created;
@@ -54,35 +58,36 @@ public class DeviceConfigAlertsEntity {
     @UpdateTimestamp
     private Instant updated;
 
-    @Column(name = "event_id")
-    @Comment("ID del evento generado")
-    private UUID eventId;
-
-    public void incrementCountMatch() {
-        this.currentCountMatch++;
-        this.lastMatchAt = Instant.now();
-    }
-
-    public void resetCountMatch() {
-        this.currentCountMatch = 0L;
-    }
-
     public void activate() {
-        this.isActive = true;
-        this.eventId = UUID.randomUUID();
+        this.active = true;
+        this.sendEventAt = Instant.now();
+        this.activationDate = Instant.now();
+        this.eventId = UUID.randomUUID().toString();
     }
 
     public void markAsResolved() {
-        this.isActive = false;
-        this.currentCountMatch = 0L;
-        this.eventId = null;
+        this.active = false;
+        this.activationDate = null;
+        this.eventId = "";
+        this.sendEventAt = null;
     }
 
-    public boolean isReadyToActivate() {
-        return this.currentCountMatch >= this.configAlerts.getCountEventForActivate();
+    public boolean isActive() {
+        return this.eventId != null && !eventId.isBlank();
     }
 
-    public boolean isReadyToDeactivate() {
-        return this.currentCountMatch >= this.configAlerts.getCountEventForDeactivate();
+    public boolean isInactive() {
+        return !Boolean.TRUE.equals(this.active);
+    }
+
+    public static DeviceConfigAlertsEntity of(DeviceEntity device, ConfigAlertsEntity configAlerts) {
+        return DeviceConfigAlertsEntity.builder()
+                .device(device)
+                .configAlerts(configAlerts)
+                .active(false)
+                .sendEventAt(null)
+                .eventId("")
+                .activationDate(null)
+                .build();
     }
 }
