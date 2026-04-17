@@ -35,28 +35,20 @@ public class AtuTransmissionUseCase {
 
     private final ConcurrentHashMap<String, Instant> lastTransmissionByImei = new ConcurrentHashMap<>();
 
-    public void evaluateAndTransmit(Position position, Long deviceId, Long companyId) {
+    public void evaluateAndTransmit(Position position, TripState tripState) {
         try {
+            Long companyId = tripState.getCompanyId();
             Optional<AtuTokenCache> configOpt = atuConfigPort.getAtuConfig(companyId);
             if (configOpt.isEmpty()) {
                 log.info("ATU skip: companyId={} sin token ATU configurado en Redis/DB", companyId);
                 return;
             }
             AtuTokenCache config = configOpt.get();
-
-            Optional<Long> vehicleIdOpt = routeConfigClient.getVehicleIdByDeviceId(deviceId);
-            if (vehicleIdOpt.isEmpty()) {
-                log.info("ATU skip: deviceId={} sin vehículo asociado en caché (Verificar sincronización)", deviceId);
+            if (config.getToken() == null || config.getToken().isBlank()) {
+                log.warn("ATU skip: Token ATU vacío o nulo para companyId={} (Verificar configuración)", companyId);
                 return;
             }
 
-            Optional<TripState> tripStateOpt = tripStateManager.getStateByVehicleId(vehicleIdOpt.get());
-            if (tripStateOpt.isEmpty()) {
-                log.info("ATU skip: vehicleId={} sin viaje activo detectado en Ingestion (TripState)",
-                        vehicleIdOpt.get());
-                return;
-            }
-            TripState tripState = tripStateOpt.get();
 
             Instant deviceTime = (position.getDeviceTime() != null)
                     ? position.getDeviceTime().toInstant()
@@ -85,16 +77,24 @@ public class AtuTransmissionUseCase {
 
             String routeId = resolveRouteId(tripState);
             int directionId = mapDirection(tripState.getDirection());
-            long ts = deviceTime.toEpochMilli();
+
+            long ts = (Instant.now().toEpochMilli() / 1000) * 1000;
 
             long tsInitialTrip = (tripState.getDispatchTime() != null)
-                    ? tripState.getDispatchTime().toEpochMilli()
+                    ? (tripState.getDispatchTime().toEpochMilli() / 1000) * 1000
                     : ts;
 
-            String licensePlate = routeConfigClient
-                    .getVehicleIdByDeviceId(deviceId)
-                    .flatMap(vId -> routeConfigClient.getVehiclePlate(vId))
+            if (tsInitialTrip > ts + 60_000L) {
+                log.warn("[ATU] tsinitialtrip futuro detectado ({}), usando ts actual ({})", tsInitialTrip, ts);
+                tsInitialTrip = ts;
+            }
+
+            String rawLicensePlate = routeConfigClient
+                    .getVehiclePlate(tripState.getVehicleId())
                     .orElse("UNKNOWN");
+
+
+            String licensePlate = rawLicensePlate.replace("-", "").toUpperCase();
 
             String driverDoi = Optional.ofNullable(tripState.getDriverDocumentNumber())
                     .filter(doi -> !doi.isBlank())
@@ -104,14 +104,18 @@ public class AtuTransmissionUseCase {
 
             String identifier = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
 
+            if (driverDoi == null || driverDoi.equalsIgnoreCase("desconocido") || driverDoi.isBlank()) {
+                driverDoi = DEFAULT_DRIVER_DOI;
+            }
+
             AtuPayload payload = AtuPayload.builder()
                     .imei(imei)
-                    .latitude(position.getLatitude())
-                    .longitude(position.getLongitude())
+                    .latitude(round(position.getLatitude(), 6))
+                    .longitude(round(position.getLongitude(), 6))
                     .routeId(routeId)
                     .ts(ts)
                     .licensePlate(truncate(licensePlate, 7))
-                    .speed(position.getSpeedInKm())
+                    .speed(round(position.getSpeedInKm(), 2))
                     .directionId(directionId)
                     .driverId(driverDoi)
                     .tsInitialTrip(tsInitialTrip)
@@ -119,18 +123,20 @@ public class AtuTransmissionUseCase {
                     .build();
 
             if (!isValidPayload(payload)) {
-                log.warn("ATU skip: Payload inválido no cumple con el formato ATU. IMEI={}", imei);
+                log.warn("ATU skip: Payload inválido no cumple con el formato ATU. IMEI={} Payload={}", imei, payload);
                 return;
             }
 
             log.info("[ATU] Preparando JSON para envío: IMEI={}, Placa={}, Ruta={}",
                     payload.getImei(), payload.getLicensePlate(), payload.getRouteId());
-            atuWebSocketPort.sendPayload(config.getToken(), config.getEndpoint(), payload);
+            
+            boolean sent = atuWebSocketPort.sendPayload(config.getToken(), config.getEndpoint(), payload);
 
-            lastTransmissionByImei.put(imei, now);
-
-            log.debug("ATU trama enviada: IMEI={} routeId={} direction={} driverId={}",
-                    imei, routeId, directionId, driverDoi);
+            if (sent) {
+                lastTransmissionByImei.put(imei, now);
+                log.debug("ATU trama enviada: IMEI={} routeId={} direction={} driverId={}",
+                        imei, routeId, directionId, driverDoi);
+            }
 
         } catch (Exception e) {
             log.error("ATU error inesperado transmitiendo para IMEI={}: {}",
@@ -166,10 +172,18 @@ public class AtuTransmissionUseCase {
         return value.length() > maxLength ? value.substring(0, maxLength) : value;
     }
 
+    private double round(double value, int places) {
+        if (places < 0) throw new IllegalArgumentException();
+        long factor = (long) Math.pow(10, places);
+        value = value * factor;
+        long tmp = Math.round(value);
+        return (double) tmp / factor;
+    }
+
     private boolean isValidPayload(AtuPayload payload) {
-        if (payload.getImei() == null || !payload.getImei().matches("^[a-zA-Z0-9]{15}$"))
+        if (payload.getImei() == null || !payload.getImei().matches("^[0-9]{15}$"))
             return false;
-        if (payload.getLicensePlate() == null || !payload.getLicensePlate().matches("^[a-zA-Z0-9-]{1,7}$"))
+        if (payload.getLicensePlate() == null || !payload.getLicensePlate().matches("^[a-zA-Z0-9]{1,7}$"))
             return false;
         if (payload.getLatitude() < -90 || payload.getLatitude() > 90)
             return false;

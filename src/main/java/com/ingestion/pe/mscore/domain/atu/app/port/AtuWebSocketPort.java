@@ -9,5 +9,5 @@ public interface AtuWebSocketPort {
      * @param endpoint URL WS completa (sin el parámetro token)
      * @param payload  Trama GPS a transmitir
      */
-    void sendPayload(String token, String endpoint, AtuPayload payload);
+    boolean sendPayload(String token, String endpoint, AtuPayload payload);
 }

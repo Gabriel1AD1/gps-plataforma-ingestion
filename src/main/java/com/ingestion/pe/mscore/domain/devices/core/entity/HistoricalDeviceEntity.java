@@ -22,7 +22,8 @@ import org.hibernate.annotations.OnDeleteAction;
 @Builder
 public class HistoricalDeviceEntity {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "historical_seq")
+    @SequenceGenerator(name = "historical_seq", sequenceName = "historical_batch_seq", schema = "devices_module", allocationSize = 100)
     @Column(name = "id", nullable = false)
     private Long id;
 
@@ -80,9 +81,14 @@ public class HistoricalDeviceEntity {
     public static HistoricalDeviceEntity map(Position position, DeviceEntity device) {
         HistoricalDeviceEntity historicalDeviceEntity = new HistoricalDeviceEntity();
 
-        UUID traceUuid = position.getCorrelationId() != null
+        UUID traceUuid;
+        try {
+            traceUuid = position.getCorrelationId() != null
                 ? UUID.fromString(position.getCorrelationId())
                 : UUID.randomUUID();
+        } catch (IllegalArgumentException e) {
+            traceUuid = UUID.randomUUID();
+        }
 
         historicalDeviceEntity.setTraceUuid(traceUuid);
         historicalDeviceEntity.setProtocol(position.getProtocol());

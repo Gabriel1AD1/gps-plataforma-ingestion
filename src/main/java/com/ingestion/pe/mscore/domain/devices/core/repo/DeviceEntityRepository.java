@@ -49,4 +49,9 @@ public interface DeviceEntityRepository extends JpaRepository<DeviceEntity, Long
             GROUP BY d.deviceStatus
             """)
     List<DevicesStatusSummary> allSummary(@Param("companyId") Long companyId);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE DeviceEntity d SET d.lastHistoricalDevice = :historicalId WHERE d.id = :deviceId")
+    void updateLastHistoricalDevice(@Param("deviceId") Long deviceId, @Param("historicalId") Long historicalId);
 }
