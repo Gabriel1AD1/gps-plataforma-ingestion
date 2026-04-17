@@ -27,21 +27,32 @@ public final class DeviceWebsocketMessageRefreshFactory {
         }
 
         public static WebsocketMessage newDeviceUpdate(
-                        Long companyId, DeviceEntity device, HistoricalDeviceEntity historicalSave) {
+                        Long companyId, DeviceEntity device, HistoricalDeviceEntity historicalSave, String traceUuid) {
                 Map<String, Object> attributes = new HashMap<>();
                 attributes.put("deviceId", device.getId());
                 attributes.put("imei", device.getImei());
-                attributes.put("historicalId", historicalSave.getId());
+                attributes.put("traceUuid", traceUuid);
+                attributes.put("historicalId", historicalSave != null ? historicalSave.getId() : null);
                 attributes.put("status", device.getStatus());
                 attributes.put("sensor", device.getSensor());
-                attributes.put("latitude", historicalSave.getLatitude());
-                attributes.put("longitude", historicalSave.getLongitude());
-                attributes.put("speedInKm", historicalSave.getSpeedInKm());
-                attributes.put("course", historicalSave.getCourse());
-                attributes.put("address", historicalSave.getAddress());
-                attributes.put("severTime", historicalSave.getServerTime().toString());
-                attributes.put("deviceTime", historicalSave.getDeviceTime().toString());
-                attributes.put("fixTime", historicalSave.getFixTime().toString());
+                
+                if (historicalSave != null) {
+                    attributes.put("latitude", historicalSave.getLatitude());
+                    attributes.put("longitude", historicalSave.getLongitude());
+                    attributes.put("speedInKm", historicalSave.getSpeedInKm());
+                    attributes.put("course", historicalSave.getCourse());
+                    attributes.put("address", historicalSave.getAddress());
+                    attributes.put("severTime", historicalSave.getServerTime().toString());
+                    attributes.put("deviceTime", historicalSave.getDeviceTime().toString());
+                    attributes.put("fixTime", historicalSave.getFixTime().toString());
+                } else {
+                    attributes.put("latitude", device.getLatitude());
+                    attributes.put("longitude", device.getLongitude());
+                    attributes.put("speedInKm", device.getSpeedInKmh());
+                    attributes.put("course", device.getCourse());
+                    attributes.put("deviceTime", device.getDeviceTime() != null ? device.getDeviceTime().toString() : Instant.now().toString());
+                }
+                
                 attributes.put("sensorsRaw", device.getSensorRaw());
                 attributes.put("sensorData", device.getSensorsData());
                 attributes.put("updateAt", Instant.now().toString());

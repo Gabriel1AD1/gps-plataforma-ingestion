@@ -341,7 +341,11 @@ public class DeviceEntity {
      * @param newLongitude nueva longitud del dispositivo
      */
     public void calculateNewOdometer(Double newLatitude, Double newLongitude) {
-        if (this.latitude != null && this.longitude != null) {
+        if (this.odometerInMeters == null) {
+            this.odometerInMeters = 0L;
+        }
+
+        if (this.latitude != null && this.longitude != null && newLatitude != null && newLongitude != null) {
             double earthRadius = 6371e3;
             double dLat = Math.toRadians(newLatitude - this.latitude);
             double dLon = Math.toRadians(newLongitude - this.longitude);
@@ -353,7 +357,9 @@ public class DeviceEntity {
             double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             double distance = earthRadius * c;
 
-            this.odometerInMeters += (long) distance;
+            if (!Double.isNaN(distance) && distance > 0) {
+                this.odometerInMeters += (long) distance;
+            }
         }
         this.latitude = newLatitude;
         this.longitude = newLongitude;

@@ -61,6 +61,7 @@ dependencies {
     testCompileOnly("org.projectlombok:lombok:1.18.26")
     
     runtimeOnly("org.postgresql:postgresql")
+    testImplementation("com.h2database:h2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     implementation ("me.paulschwarz:spring-dotenv:3.0.0")
     

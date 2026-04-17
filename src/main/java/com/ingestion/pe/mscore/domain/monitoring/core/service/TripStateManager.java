@@ -19,11 +19,20 @@ public class TripStateManager {
     private static final long TTL_SECONDS = 3600; // 1h backup
 
     private final ConcurrentHashMap<Long, TripState> activeStates = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, Long> vehicleIdToTripId = new ConcurrentHashMap<>();
     private final CacheDao<TripState> tripStateCacheDao;
 
     // Actualizar estado de un viaje (llamado en cada posición GPS)
     public void updateState(Long tripId, TripState state) {
         activeStates.put(tripId, state);
+        if (state.getVehicleId() != null) {
+            vehicleIdToTripId.put(state.getVehicleId(), tripId);
+        }
+        try {
+            tripStateCacheDao.save(KEY_PREFIX + tripId, state, TTL_SECONDS);
+        } catch (Exception e) {
+            log.warn("Error guardando TripState {} en Redis: {}", tripId, e.getMessage());
+        }
     }
 
     // Obtener estado de un viaje específico
@@ -40,15 +49,20 @@ public class TripStateManager {
 
     // Remover estado al completar viaje
     public void removeState(Long tripId) {
-        activeStates.remove(tripId);
+        TripState removed = activeStates.remove(tripId);
+        if (removed != null && removed.getVehicleId() != null) {
+            vehicleIdToTripId.remove(removed.getVehicleId());
+        }
         tripStateCacheDao.delete(KEY_PREFIX + tripId);
     }
 
     // Verificar si hay un estado activo para un vehículo
     public Optional<TripState> getStateByVehicleId(Long vehicleId) {
-        return activeStates.values().stream()
-                .filter(state -> vehicleId.equals(state.getVehicleId()))
-                .findFirst();
+        Long tripId = vehicleIdToTripId.get(vehicleId);
+        if (tripId == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(activeStates.get(tripId));
     }
 
     // Backup periódico a Redis (recuperacon por reinicio)
@@ -77,7 +91,11 @@ public class TripStateManager {
         for (Long tripId : activeTripIds) {
             Optional<TripState> stateOpt = tripStateCacheDao.get(KEY_PREFIX + tripId, TripState.class);
             if (stateOpt.isPresent()) {
-                activeStates.put(tripId, stateOpt.get());
+                TripState state = stateOpt.get();
+                activeStates.put(tripId, state);
+                if (state.getVehicleId() != null) {
+                    vehicleIdToTripId.put(state.getVehicleId(), tripId);
+                }
                 restored++;
             }
         }

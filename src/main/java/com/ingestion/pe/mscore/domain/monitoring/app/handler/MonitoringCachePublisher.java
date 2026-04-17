@@ -11,13 +11,12 @@ import com.ingestion.pe.mscore.domain.monitoring.core.service.TripStateManager;
 import com.ingestion.pe.mscore.domain.monitoring.infra.cache.RouteConfigClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import com.ingestion.pe.mscore.commons.models.WebsocketMessage;
 import com.ingestion.pe.mscore.bridge.pub.service.KafkaPublisherService;
-import java.util.List;
-import java.util.Map;
+import com.ingestion.pe.mscore.commons.models.WebsocketMessage;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
@@ -33,29 +32,31 @@ public class MonitoringCachePublisher {
 
     private static final String LINEAR_VIEW_KEY_PREFIX = "monitoring:linearview:route:";
     private static final String DATERO_KEY_PREFIX = "monitoring:datero:route:";
-    private static final long TTL_SECONDS = 60; // 1 min cache for these calculated views
+    private static final long TTL_SECONDS = 86400; // 24h cache (event-driven refreshes)
 
-    @Scheduled(fixedDelay = 15000, initialDelay = 10000)
-    public void publishMonitoringData() {
-        try {
-            List<Long> routeIds = routeConfigClient.getKnownRouteIds();
-            if (routeIds.isEmpty()) {
-                return;
-            }
+    private static final long ROUTE_THROTTLE_MS = 500;
+    private final ConcurrentHashMap<Long, Long> lastRouteRefreshTime = new ConcurrentHashMap<>();
 
-            for (Long routeId : routeIds) {
-                processRoute(routeId);
-            }
-        } catch (Exception e) {
-            log.error("Error en MonitoringCachePublisher: {}", e.getMessage());
+    public void processRouteThrottled(Long routeId) {
+        if (routeId == null) return;
+        long now = System.currentTimeMillis();
+        long last = lastRouteRefreshTime.getOrDefault(routeId, 0L);
+        if ((now - last) < ROUTE_THROTTLE_MS) {
+            log.debug("MonitoringCachePublisher: ruta {} throttled (<{}ms), skip", routeId, ROUTE_THROTTLE_MS);
+            return;
         }
+        lastRouteRefreshTime.put(routeId, now);
+        processRoute(routeId);
     }
 
-    private void processRoute(Long routeId) {
+
+    public void processRoute(Long routeId) {
         try {
             List<TripState> states = tripStateManager.getStatesByRoute(routeId);
             if (states.isEmpty()) {
-                // Opcional: limpiar cache si no hay viajes activos
+
+                log.info("MonitoringCachePublisher: ruta {} sin estados activos, limpiando Redis y notificando WS", routeId);
+                clearRouteCache(routeId, null);
                 return;
             }
 
@@ -65,10 +66,10 @@ public class MonitoringCachePublisher {
             }
 
             List<LinearViewResult> linearView = linearViewCalc.calculate(routeId, states, config);
-            
+
             List<DateroResult> datero = dateroCalc.calculate(routeId, states, config);
             cacheDao.save(DATERO_KEY_PREFIX + routeId, datero, TTL_SECONDS);
-            
+
             for (LinearViewResult lv : linearView) {
                 datero.stream().filter(d -> d.getVehicleId().equals(lv.getVehicleId())).findFirst().ifPresent(d -> {
                     lv.setAheadVehicleId(d.getAheadVehicleId());
@@ -79,17 +80,12 @@ public class MonitoringCachePublisher {
                     lv.setBehindDeltaMinutes(d.getBehindDeltaMinutes());
                 });
             }
-            
+
             cacheDao.save(LINEAR_VIEW_KEY_PREFIX + routeId, linearView, TTL_SECONDS);
 
             Long companyId = states.get(0).getCompanyId();
             if (companyId != null) {
-                WebsocketMessage msg = WebsocketMessage.refreshBuilder()
-                        .messageAgregateType(WebsocketMessage.MessageAgregateType.MONITORING_REFRESH)
-                        .companyId(companyId)
-                        .properties(Map.of("routeId", routeId))
-                        .build();
-                kafkaPublisherService.publishWebsocketMessage(msg);
+                publishRefresh(companyId, routeId);
             }
 
             log.debug("MonitoringCachePublisher: Actualizada ruta {} ({} vehículos)", routeId, states.size());
@@ -97,5 +93,42 @@ public class MonitoringCachePublisher {
         } catch (Exception e) {
             log.error("Error procesando ruta {} en MonitoringCachePublisher: {}", routeId, e.getMessage());
         }
+    }
+
+    public void processRoute(Long routeId, Long companyId) {
+        try {
+            List<TripState> states = tripStateManager.getStatesByRoute(routeId);
+            if (states.isEmpty()) {
+                log.info("MonitoringCachePublisher: ruta {} quedó vacía, limpiando Redis y notificando WS (companyId={})", routeId, companyId);
+                clearRouteCache(routeId, companyId);
+            } else {
+                processRoute(routeId);
+            }
+        } catch (Exception e) {
+            log.error("Error en processRoute(routeId={}, companyId={}) en MonitoringCachePublisher: {}", routeId, companyId, e.getMessage());
+        }
+    }
+
+    private void clearRouteCache(Long routeId, Long companyId) {
+        try {
+            cacheDao.delete(LINEAR_VIEW_KEY_PREFIX + routeId);
+            cacheDao.delete(DATERO_KEY_PREFIX + routeId);
+            log.info("MonitoringCachePublisher: Caché de ruta {} limpiada (lista vacía de vehículos)", routeId);
+
+            if (companyId != null) {
+                publishRefresh(companyId, routeId);
+            }
+        } catch (Exception e) {
+            log.error("Error limpiando caché de ruta {} en MonitoringCachePublisher: {}", routeId, e.getMessage());
+        }
+    }
+
+    private void publishRefresh(Long companyId, Long routeId) {
+        WebsocketMessage msg = WebsocketMessage.refreshBuilder()
+                .messageAgregateType(WebsocketMessage.MessageAgregateType.MONITORING_REFRESH)
+                .companyId(companyId)
+                .properties(Map.of("routeId", routeId))
+                .build();
+        kafkaPublisherService.publishWebsocketMessage(msg);
     }
 }

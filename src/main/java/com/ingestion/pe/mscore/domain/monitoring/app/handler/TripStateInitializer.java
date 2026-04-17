@@ -3,8 +3,10 @@ package com.ingestion.pe.mscore.domain.monitoring.app.handler;
 import com.ingestion.pe.mscore.domain.monitoring.core.model.TripActiveResponse;
 import com.ingestion.pe.mscore.domain.monitoring.core.service.TripStateManager;
 import com.ingestion.pe.mscore.domain.monitoring.infra.cache.RouteConfigClient;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,55 +23,76 @@ public class TripStateInitializer {
     private final TripStateManager tripStateManager;
     private final PositionMonitoringHook positionMonitoringHook;
     private final RouteConfigClient routeConfigClient;
+    private final MonitoringCachePublisher monitoringCachePublisher;
 
     private final Set<Long> knownTripIds = ConcurrentHashMap.newKeySet();
 
-    @Scheduled(fixedDelay = 15_000, initialDelay = 5_000)
+    @Scheduled(fixedDelay = 1_000, initialDelay = 5_000)
     public void pollAndInitialize() {
         try {
             List<Long> routeIds = routeConfigClient.getKnownRouteIds();
-            if (routeIds.isEmpty()) {
-                cleanupStaleStates(Set.of());
-                return;
-            }
 
             Set<Long> allActiveTripIds = new HashSet<>();
+            Set<Long> routesToUpdate = new HashSet<>();
+            Map<Long, Long> routeCompanyIds = new HashMap<>();
 
-            for (Long routeId : routeIds) {
-                List<Long> tripIds = routeConfigClient.getActiveTripsForRoute(routeId);
-                allActiveTripIds.addAll(tripIds);
-            }
-
-            for (Long tripId : allActiveTripIds) {
-                if (knownTripIds.contains(tripId)) {
-                    continue;
+            if (!routeIds.isEmpty()) {
+                for (Long routeId : routeIds) {
+                    List<Long> tripIds = routeConfigClient.getActiveTripsForRoute(routeId);
+                    allActiveTripIds.addAll(tripIds);
                 }
 
-                if (tripStateManager.getState(tripId).isPresent()) {
+                for (Long tripId : allActiveTripIds) {
+                    if (knownTripIds.contains(tripId)) {
+                        continue;
+                    }
+
+                    if (tripStateManager.getState(tripId).isPresent()) {
+                        knownTripIds.add(tripId);
+                        continue;
+                    }
+
+                    Optional<TripActiveResponse> tripOpt = routeConfigClient.getActiveTrip(tripId);
+                    if (tripOpt.isEmpty()) {
+                        continue;
+                    }
+
+                    positionMonitoringHook.initializeTripState(tripOpt.get());
                     knownTripIds.add(tripId);
-                    continue;
-                }
 
-                Optional<TripActiveResponse> tripOpt = routeConfigClient.getActiveTrip(tripId);
-                if (tripOpt.isEmpty()) {
-                    continue;
-                }
+                    routesToUpdate.add(tripOpt.get().getRouteId());
 
-                positionMonitoringHook.initializeTripState(tripOpt.get());
-                knownTripIds.add(tripId);
-                log.info("TripState auto-inicializado para tripId={}", tripId);
+                    log.info("TripState auto-inicializado para tripId={}", tripId);
+                }
             }
 
-            cleanupStaleStates(allActiveTripIds);
+            cleanupStaleStates(allActiveTripIds, routesToUpdate, routeCompanyIds);
+
+            for (Long routeId : routesToUpdate) {
+                Long companyId = routeCompanyIds.get(routeId);
+                monitoringCachePublisher.processRoute(routeId, companyId);
+            }
         } catch (Exception e) {
             log.error("Error en TripStateInitializer poll", e);
         }
     }
 
-    private void cleanupStaleStates(Set<Long> activeTripIds) {
+    private void cleanupStaleStates(Set<Long> activeTripIds, Set<Long> routesToUpdate, Map<Long, Long> routeCompanyIds) {
         knownTripIds.removeIf(tripId -> {
             if (!activeTripIds.contains(tripId)) {
-                tripStateManager.removeState(tripId);
+                Optional<com.ingestion.pe.mscore.domain.monitoring.core.model.TripState> stateOpt = tripStateManager.getState(tripId);
+                if (stateOpt.isPresent()) {
+                    Long routeId = stateOpt.get().getRouteId();
+                    Long companyId = stateOpt.get().getCompanyId();
+                    tripStateManager.removeState(tripId);
+
+                    routesToUpdate.add(routeId);
+                    if (companyId != null) {
+                        routeCompanyIds.put(routeId, companyId);
+                    }
+                } else {
+                    tripStateManager.removeState(tripId);
+                }
                 log.info("TripState removido para tripId={} (ya no activo)", tripId);
                 return true;
             }
