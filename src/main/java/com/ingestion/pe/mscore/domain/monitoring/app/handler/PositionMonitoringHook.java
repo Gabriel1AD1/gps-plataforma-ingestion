@@ -157,7 +157,7 @@ public class PositionMonitoringHook {
             }
 
             int currentIndex = state.getCurrentPointIndex();
-            int newIndex = detectControlPointCrossing(lat, lon, controlPoints, currentIndex);
+            int newIndex = detectControlPointCrossing(lat, lon, controlPoints, currentIndex, state.getDirection());
 
             double accumulatedDistance = calculateAccumulatedDistance(
                     lat, lon, controlPoints, newIndex);
@@ -217,15 +217,22 @@ public class PositionMonitoringHook {
     }
 
     private int detectControlPointCrossing(double lat, double lon,
-            List<ControlPointModel> controlPoints, int currentIndex) {
+            List<ControlPointModel> controlPoints, int currentIndex, String tripDirection) {
 
         int newIndex = currentIndex;
 
         for (int i = currentIndex + 1; i < controlPoints.size(); i++) {
             ControlPointModel cp = controlPoints.get(i);
+
+            if (tripDirection != null && cp.getDirection() != null 
+                    && !tripDirection.equalsIgnoreCase(cp.getDirection())
+                    && !"LOOP".equalsIgnoreCase(tripDirection)) {
+                continue;
+            }
+
             if (HaversineCalculator.isWithinRadius(lat, lon,
                     cp.getLatitude(), cp.getLongitude(), CONTROL_POINT_RADIUS_METERS)) {
-                newIndex = i;
+                return i; 
             }
         }
 
