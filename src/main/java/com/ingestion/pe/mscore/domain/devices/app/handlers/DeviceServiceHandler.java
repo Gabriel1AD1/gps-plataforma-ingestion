@@ -3,245 +3,137 @@ package com.ingestion.pe.mscore.domain.devices.app.handlers;
 import static com.ingestion.pe.mscore.domain.devices.app.factory.DeviceWebsocketMessageRefreshFactory.newDeviceUpdate;
 
 import com.ingestion.pe.mscore.bridge.pub.service.KafkaPublisherService;
-import com.ingestion.pe.mscore.clients.VehicleClient;
 import com.ingestion.pe.mscore.clients.cache.store.DeviceCacheStore;
-import com.ingestion.pe.mscore.domain.devices.app.resolver.EventResolver;
-import com.ingestion.pe.mscore.clients.models.VehicleResponse;
+import com.ingestion.pe.mscore.clients.models.DeviceResponse;
+import com.ingestion.pe.mscore.commons.models.WebsocketMessage;
 import com.ingestion.pe.mscore.config.cache.store.RedisPositionStore;
 import com.ingestion.pe.mscore.commons.models.Position;
-import com.ingestion.pe.mscore.commons.models.WebsocketMessage;
-import com.ingestion.pe.mscore.domain.devices.app.factory.DeviceApplicationEventFactory;
-import com.ingestion.pe.mscore.domain.devices.app.manager.ManagerConfigAlert;
-import com.ingestion.pe.mscore.domain.devices.core.entity.DeviceConfigAlertsEntity;
+import com.ingestion.pe.mscore.domain.devices.app.batch.HistoricalBatchSaver;
 import com.ingestion.pe.mscore.domain.devices.core.entity.DeviceEntity;
 import com.ingestion.pe.mscore.domain.devices.core.entity.HistoricalDeviceEntity;
-import com.ingestion.pe.mscore.domain.devices.core.repo.DeviceConfigAlertsEntityRepository;
+import com.ingestion.pe.mscore.domain.devices.core.models.SensorModel;
 import com.ingestion.pe.mscore.domain.devices.core.repo.DeviceEntityRepository;
-import com.ingestion.pe.mscore.domain.devices.core.repo.HistoricalDeviceEntityRepository;
-import com.ingestion.pe.mscore.domain.devices.core.repo.UserDeviceEntityRepository;
-import com.ingestion.pe.mscore.domain.devices.core.repo.EventEntityRepository;
-import com.ingestion.pe.mscore.domain.devices.core.entity.EventEntity;
+
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class DeviceServiceHandler {
-        private final DeviceEntityRepository deviceEntityRepository;
-        private final UserDeviceEntityRepository userDeviceEntityRepository;
-        private final KafkaPublisherService kafkaPublisherService;
-        private final HistoricalDeviceEntityRepository historicalDeviceEntityRepository;
-        private final DeviceConfigAlertsEntityRepository deviceConfigAlertsEntityRepository;
-        // private final EventCreateBridgeService eventCreateBridgeService;
-        private final ManagerConfigAlert managerConfigAlert;
-        private final VehicleClient vehicleClient;
-        private final DeviceCacheStore deviceCacheStore;
-        private final com.ingestion.pe.mscore.applications.tracking.TrackingProcessorService trackingProcessorService;
-        private final RedisPositionStore redisPositionStore;
-        private final PositionMonitoringAsyncDispatcher positionMonitoringAsyncDispatcher;
-        private final com.ingestion.pe.mscore.domain.atu.app.dispatcher.AtuTransmissionAsyncDispatcher atuTransmissionAsyncDispatcher;
-        private final EventEntityRepository eventEntityRepository;
-        private final EventResolver eventResolver;
+    private final DeviceEntityRepository deviceEntityRepository;
+    private final KafkaPublisherService kafkaPublisherService;
+    private final DeviceCacheStore deviceCacheStore;
+    private final RedisPositionStore redisPositionStore;
+    private final PositionMonitoringAsyncDispatcher positionMonitoringAsyncDispatcher;
 
-        @Transactional
-        public void handleDeviceEvent(Position position) {
-                Optional<DeviceEntity> deviceOpt = deviceEntityRepository.findByImei(position.getImei());
+    private final HistoricalBatchSaver historicalBatchSaver;
+    private final AlertsAsyncDispatcher alertsAsyncDispatcher;
 
-                if (deviceOpt.isPresent()) {
-                        DeviceEntity device = deviceOpt.get();
-                        try {
-                                log.info("[DEBUG] Procesando Dispositivo ID: {}, IMEI: {}",
-                                                device.getId(), device.getImei());
-                                log.info("[DEBUG] Datos ANTES de update: LastData={}, Speed={}, Lat={}, Lon={}",
-                                                device.getLastDataReceived(),
-                                                device.getSpeedInKmh(), device.getLatitude(),
-                                                device.getLongitude());
-
-                                Long company = Optional.ofNullable(device.getCompany())
-                                                .orElseGet(() -> {
-                                                        log.warn("El dispositivo con IMEI: {} no tiene una empresa asignada",
-                                                                        device.getImei());
-                                                        return 0L;
-                                                });
-
-                                log.debug("Sensor data traido desde la db desde el service handler {}",
-                                                device.getSensorsData());
-                                device.handlerPosition(position);
-                                log.debug("Sensor data procesado desde el service handler {}",
-                                                device.getSensorsData());
-
-                                Set<UUID> usersNotSendPositions = userDeviceEntityRepository
-                                                .findAllByDeviceReturnUuids(device);
-
-                                HistoricalDeviceEntity historicalDeviceEntity = HistoricalDeviceEntity
-                                                .map(position, device);
-
-                                var historicalSave = historicalDeviceEntityRepository.save(historicalDeviceEntity);
-
-                                device.setLastHistoricalDevice(historicalSave.getId());
-
-                                Map<String, Object> attributes = device.getSensorOnTime();
-
-                                deviceEntityRepository.save(device);
-                                log.info("[DEBUG] Dispositivo GUARDADO. Datos AHORA: LastData={}, Speed={}, Lat={}, Lon={}",
-                                                device.getLastDataReceived(),
-                                                device.getSpeedInKmh(),
-                                                device.getLatitude(),
-                                                device.getLongitude());
-
-                                trackingProcessorService.processPositionForTracking(position, company);
-
-                                redisPositionStore.savePosition(position, company);
-
-                                Set<DeviceConfigAlertsEntity> configAlertsEntities = managerConfigAlert
-                                                .executeConfigAlertRules(device.getId(), attributes);
-
-                                markConfigResolved(device, configAlertsEntities, attributes);
-                                markConfigNotResolved(device, configAlertsEntities, usersNotSendPositions, company);
-
-                                deviceConfigAlertsEntityRepository.saveAll(configAlertsEntities);
-
-                                sendNewPosition(device, historicalSave, company);
-
-                                // eventCreateBridgeService.createEvent(
-                                // DevicePositionEventCreate.builder()
-                                // .deviceId(device.getId())
-                                // .deviceTime(position.getDeviceTime() != null
-                                // ? position.getDeviceTime().toInstant()
-                                // : Instant.now())
-                                // .imei(device.getImei())
-                                // .sensors(device.getSensor())
-                                // .sensorData(sensorData)
-                                // .position(position)
-                                // .build());
-                                saveInCache(device);
-
-                                positionMonitoringAsyncDispatcher.dispatchAsync(
-                                                device.getId(),
-                                                position.getLatitude(),
-                                                position.getLongitude(),
-                                                position.getSpeedInKm(),
-                                                position.getDeviceTime() != null
-                                                                ? position.getDeviceTime().toInstant()
-                                                                : Instant.now());
-
-                                atuTransmissionAsyncDispatcher.dispatchAsync(position, device.getId(), company);
-
-                        } catch (Exception e) {
-                                log.error("Error procesando evento de dispositivo: {}", e.getMessage(), e);
-                                throw e;
-                        }
-                } else {
-                        log.warn("[DEBUG] No se encontró el dispositivo con IMEI: {}", position.getImei());
-                }
+    public void handleDeviceEvent(Position position) {
+        DeviceEntity device = resolveDevice(position.getImei());
+        if (device == null) {
+            log.warn("DeviceServiceHandler: Dispositivo no registrado - IMEI: {}", position.getImei());
+            return;
         }
 
-        private void saveInCache(DeviceEntity device) {
-                try {
-                        deviceCacheStore.save(device);
-                } catch (Exception e) {
-                        log.error("Error saving device in cache: {}", e.getMessage(), e);
-                }
+        try {
+            log.info("[DEBUG] Procesando Dispositivo ID: {}, IMEI: {}", device.getId(), device.getImei());
+            Long companyId = Optional.ofNullable(device.getCompany()).orElse(0L);
+            String traceUuid = position.getCorrelationId();
+
+            device.handlerPosition(position);
+   
+            saveInCache(device);
+            redisPositionStore.savePosition(position, companyId);
+            
+            sendNewPosition(device, companyId, traceUuid);
+
+            HistoricalDeviceEntity historical = HistoricalDeviceEntity.map(position, device);
+            historicalBatchSaver.enqueue(historical);
+
+            Map<String, Object> sensorSnapshot = new HashMap<>(device.getSensorOnTime());
+            alertsAsyncDispatcher.dispatchAsync(device.getId(), sensorSnapshot, companyId);
+
+            positionMonitoringAsyncDispatcher.dispatchAsync(
+                    device.getId(),
+                    position.getLatitude(),
+                    position.getLongitude(),
+                    position.getSpeedInKm(),
+                    position.getDeviceTime() != null ? position.getDeviceTime().toInstant() : Instant.now(),
+                    position,
+                    companyId);
+
+
+            log.info("[DEBUG] Dispositivo procesado en Fast-Lane. IMEI: {}", device.getImei());
+
+        } catch (Exception e) {
+            log.error("DeviceServiceHandler: Error procesando IMEI {} (ID {}). Detalle: {}", 
+                    position.getImei(), device.getId(), e.getMessage(), e);
         }
+    }
 
-        /**
-         * Marca las configuraciones de alerta que han sido desactivadas y crea los
-         * eventos de resolución
-         * correspondientes.
-         *
-         * @param configAlertsEntities Entidades de configuración de alertas
-         * @param attributes           Atributos del dispositivo
-         */
-        private void markConfigResolved(
-                        DeviceEntity device,
-                        Set<DeviceConfigAlertsEntity> configAlertsEntities, Map<String, Object> attributes) {
-                configAlertsEntities.stream()
-                                .filter(deactivatedAlert -> !deactivatedAlert.isActive())
-                                .forEach(
-                                                deactivatedAlert -> {
-                                                        String resolutionNotes = "Configuracion de alerta con titulo ["
-                                                                        + deactivatedAlert.getConfigAlerts().getTitle()
-                                                                        + "] Ya no se encuentra activa";
-                                                        if (deactivatedAlert.getEventId() != null) {
-                                                                eventEntityRepository
-                                                                                .findTopByAggregateIdAndEventTypeAndResolvedFalseOrderByOccurredAtDesc(
-                                                                                                device.getId().toString(),
-                                                                                                deactivatedAlert.getConfigAlerts()
-                                                                                                                .getTitle())
-                                                                                .ifPresent(existingEvent -> {
-                                                                                        existingEvent.markIsResolved(
-                                                                                                        resolutionNotes,
-                                                                                                        attributes);
-                                                                                        eventEntityRepository.save(
-                                                                                                        existingEvent);
-                                                                                        eventResolver.resolveEvent(
-                                                                                                        existingEvent);
-                                                                                });
-                                                        }
+    private DeviceEntity resolveDevice(String imei) {
+        return deviceCacheStore.getByImei(imei)
+                .map(this::mapToEntity)
+                .orElseGet(() -> {
+                    log.info("DeviceServiceHandler: Cache MISS IMEI {}, cargando de DB", imei);
+                    return deviceEntityRepository.findByImei(imei)
+                            .map(entity -> {
+                                deviceCacheStore.save(entity);
+                                return entity;
+                            }).orElse(null);
+                });
+    }
 
-                                                        deactivatedAlert.markAsResolved();
-                                                });
+    private DeviceEntity mapToEntity(DeviceResponse response) {
+        DeviceEntity entity = new DeviceEntity();
+        entity.setId(response.getId());
+        entity.setImei(response.getImei());
+        entity.setCompany(response.getCompanyId());
+        entity.setLatitude(response.getLatitude());
+        entity.setLongitude(response.getLongitude());
+        entity.setSpeedInKmh(response.getSpeedInKmh());
+        entity.setAltitude(response.getAltitude());
+        entity.setSensor(response.getSensor());
+        entity.setSensorRaw(response.getSensorRaw());
+        entity.setDataHistory(response.getDataHistory());
+        
+        if (response.getSensorData() != null) {
+            Set<SensorModel> sensors = response.getSensorData().stream()
+                    .map(m -> SensorModel.builder()
+                            .key((String) m.get("key"))
+                            .value((String) m.get("value"))
+                            .timestamp(m.get("timestamp") != null ? Instant.parse(m.get("timestamp").toString()) : Instant.now())
+                            .lastStateChangeTimestamp(m.get("lastStateChangeTimestamp") != null ? Instant.parse(m.get("lastStateChangeTimestamp").toString()) : Instant.now())
+                            .timeInCurrentState(m.get("timeInCurrentState") != null ? Long.valueOf(m.get("timeInCurrentState").toString()) : 0L)
+                            .build())
+                    .collect(Collectors.toSet());
+            entity.setSensorsData(sensors);
+            entity.setSensorOnTime(entity.getSensorOnTime(sensors));
+        } else {
+            entity.setSensorsData(new HashSet<>());
+            entity.setSensorOnTime(new HashMap<>());
         }
+        
+        return entity;
+    }
 
-        /**
-         * @param device         Dispositivo
-         * @param historicalSave Histórico de dispositivo guardado
-         * @param company        Empresa ala cual se debe notificar
-         */
-        protected void sendNewPosition(
-                        DeviceEntity device, HistoricalDeviceEntity historicalSave, Long company) {
-                WebsocketMessage websocketMessage = newDeviceUpdate(company, device, historicalSave);
-                kafkaPublisherService.publishWebsocketMessage(websocketMessage);
+    private void saveInCache(DeviceEntity device) {
+        try {
+            deviceCacheStore.save(device);
+        } catch (Exception e) {
+            log.error("DeviceServiceHandler cache sync error: {}", e.getMessage());
         }
+    }
 
-        /**
-         * Marca las configuraciones de alerta que no se han resuelto y crea los eventos
-         * correspondientes.
-         *
-         * @param device                Dispositivo
-         * @param configAlertsEntities  Entidades de configuración de alertas
-         * @param usersNotSendPositions Usuarios que no deben recibir notificaciones
-         * @param companyId             ID de la empresa
-         */
-        private void markConfigNotResolved(
-                        DeviceEntity device,
-                        Set<DeviceConfigAlertsEntity> configAlertsEntities,
-                        Set<UUID> usersNotSendPositions,
-                        Long companyId) {
-                List<VehicleResponse> vehicleAsociateForDevice = configAlertsEntities.stream()
-                                .anyMatch(DeviceConfigAlertsEntity::isActive)
-                                                ? vehicleClient.getVehiclesByIds(List.of(device.getId()))
-                                                : List.of();
-
-                configAlertsEntities.stream()
-                                .filter(DeviceConfigAlertsEntity::isActive)
-                                .forEach(
-                                                triggeredAlertsFor -> {
-                                                        log.info(
-                                                                        "Alerta de configuración activada para el dispositivo IMEI: {}. Alerta: {}",
-                                                                        device.getImei(),
-                                                                        triggeredAlertsFor.getConfigAlerts()
-                                                                                        .getTitle());
-                                                        var event = DeviceApplicationEventFactory
-                                                                        .newConfigAlertNotResolved(
-                                                                                        device,
-                                                                                        usersNotSendPositions,
-                                                                                        companyId,
-                                                                                        triggeredAlertsFor,
-                                                                                        vehicleAsociateForDevice);
-
-                                                        EventEntity eventEntity = EventEntity.map(event);
-                                                        eventEntity = eventEntityRepository.save(eventEntity);
-
-                                                        triggeredAlertsFor.setEventId(eventEntity.getEventId());
-                                                        triggeredAlertsFor.setSendEventAt(Instant.now());
-
-                                                        eventResolver.resolveEvent(eventEntity);
-                                                });
-        }
+    protected void sendNewPosition(DeviceEntity device, Long company, String traceUuid) {
+        WebsocketMessage websocketMessage = newDeviceUpdate(company, device, null, traceUuid);
+        kafkaPublisherService.publishWebsocketMessage(websocketMessage);
+    }
 }

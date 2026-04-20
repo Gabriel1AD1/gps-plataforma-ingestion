@@ -1,5 +1,7 @@
 package com.ingestion.pe.mscore.domain.atu.core.model;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,15 +12,23 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class AtuResponse {
 
-    @JsonProperty("Código")
+    @JsonProperty("codigo")
+    @JsonAlias({"code", "Codigo", "status"})
     private String code;
 
+    @JsonProperty("descripcion")
+    @JsonAlias({"description", "message", "mensaje", "Descripcion"})
+    private String description;
+
     @JsonProperty("Identifier")
+    @JsonAlias({"identifier", "id"})
     private String identifier;
 
     @JsonProperty("Timestamp")
+    @JsonAlias({"timestamp", "ts"})
     private String timestamp;
 
     public boolean isSuccess() {
@@ -26,6 +36,9 @@ public class AtuResponse {
     }
     
     public String getMessage() {
+        if (description != null && !description.isBlank()) {
+            return description;
+        }
         if (code == null) return "Código desconocido";
         return switch (code) {
             case "00" -> "Se recepcionó la trama correctamente";

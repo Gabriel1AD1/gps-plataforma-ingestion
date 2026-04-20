@@ -67,9 +67,10 @@ public class LinearViewCalculator {
     }
 
     private double calculateProgress(TripState state, List<ControlPointModel> controlPoints,
-            double totalDistance) {
+            double totalRouteDistance) {
 
         int currentIndex = state.getCurrentPointIndex();
+        String direction = state.getDirection();
 
         if (currentIndex < 0 || currentIndex >= controlPoints.size()) {
             return 0.0;
@@ -98,8 +99,37 @@ public class LinearViewCalculator {
 
         double totalAcumulado = baseDistance + segmentDistance;
         state.setAccumulatedDistanceKm(totalAcumulado);
-        double progress = (totalAcumulado / totalDistance) * 100.0;
 
+        double minDirDist = 0.0;
+        double maxDirDist = totalRouteDistance;
+
+        if (direction != null && !"LOOP".equalsIgnoreCase(direction)) {
+            double minFound = Double.MAX_VALUE;
+            double maxFound = -1.0;
+            boolean found = false;
+
+            for (ControlPointModel cp : controlPoints) {
+                if (direction.equalsIgnoreCase(cp.getDirection())) {
+                    double d = cp.getDistanceFromStartKm() != null ? cp.getDistanceFromStartKm() : 0.0;
+                    if (d < minFound) minFound = d;
+                    if (d > maxFound) maxFound = d;
+                    found = true;
+                }
+            }
+
+            if (found) {
+                minDirDist = minFound;
+                maxDirDist = maxFound;
+            }
+        }
+
+        double denominator = maxDirDist - minDirDist;
+        if (denominator <= 0) {
+            double progress = (totalAcumulado / totalRouteDistance) * 100.0;
+            return Math.max(0.0, Math.min(100.0, progress));
+        }
+
+        double progress = ((totalAcumulado - minDirDist) / denominator) * 100.0;
         return Math.max(0.0, Math.min(100.0, progress));
     }
 }

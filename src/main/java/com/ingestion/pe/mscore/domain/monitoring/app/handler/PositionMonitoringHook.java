@@ -1,7 +1,9 @@
 package com.ingestion.pe.mscore.domain.monitoring.app.handler;
 
 import com.ingestion.pe.mscore.bridge.pub.service.KafkaPublisherService;
+import com.ingestion.pe.mscore.commons.models.Position;
 import com.ingestion.pe.mscore.commons.models.WebsocketMessage;
+import com.ingestion.pe.mscore.domain.atu.app.dispatcher.AtuTransmissionAsyncDispatcher;
 import com.ingestion.pe.mscore.domain.monitoring.core.calc.DelayCalculator;
 import com.ingestion.pe.mscore.domain.monitoring.core.calc.HaversineCalculator;
 import com.ingestion.pe.mscore.domain.monitoring.core.model.ControlPointModel;
@@ -16,6 +18,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -32,9 +37,53 @@ public class PositionMonitoringHook {
     private final RouteConfigClient routeConfigClient;
     private final DelayCalculator delayCalculator;
     private final KafkaPublisherService kafkaPublisherService;
+    private final MonitoringCachePublisher monitoringCachePublisher;
+    private final AtuTransmissionAsyncDispatcher atuTransmissionAsyncDispatcher;
 
-    public void onPositionReceived(Long deviceId, double lat, double lon, double speedKmh, Instant time) {
+    private record PositionTask(Long deviceId, double lat, double lon, double speedKmh, Instant time, Position position, Long companyId) {}
+
+    private final ConcurrentHashMap<Long, AtomicReference<PositionTask>> pendingByDevice = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, AtomicBoolean> busyByDevice = new ConcurrentHashMap<>();
+
+    public void onPositionReceived(Long deviceId, double lat, double lon, double speedKmh, Instant time, Position position, Long companyId) {
+        AtomicReference<PositionTask> pendingRef = pendingByDevice.computeIfAbsent(deviceId, k -> new AtomicReference<>());
+        AtomicBoolean busyFlag = busyByDevice.computeIfAbsent(deviceId, k -> new AtomicBoolean(false));
+
+        pendingRef.set(new PositionTask(deviceId, lat, lon, speedKmh, time, position, companyId));
+
+        if (!busyFlag.compareAndSet(false, true)) {
+            log.debug("PositionMonitoringHook: device={} ocupado (latest-wins), posición registrada como pending", deviceId);
+            return;
+        }
+
         try {
+            PositionTask task;
+            while ((task = pendingRef.getAndSet(null)) != null) {
+                processPositionInternal(task);
+            }
+        } finally {
+            busyFlag.set(false);
+            if (pendingRef.get() != null && busyFlag.compareAndSet(false, true)) {
+                try {
+                    PositionTask task;
+                    while ((task = pendingRef.getAndSet(null)) != null) {
+                        processPositionInternal(task);
+                    }
+                } finally {
+                    busyFlag.set(false);
+                }
+            }
+        }
+    }
+
+    private void processPositionInternal(PositionTask task) {
+        try {
+            Long deviceId = task.deviceId();
+            double lat = task.lat();
+            double lon = task.lon();
+            double speedKmh = task.speedKmh();
+            Instant time = task.time();
+
             Optional<TripState> existingState = findStateByDeviceContext(deviceId);
 
             if (existingState.isEmpty()) {
@@ -63,7 +112,6 @@ public class PositionMonitoringHook {
 
             TripState state = existingState.get();
 
-            // Obtener configuración de la ruta (control points)
             Optional<RouteConfigResponse> configOpt = routeConfigClient.getRouteConfig(state.getRouteId());
             if (configOpt.isEmpty()) {
                 log.debug("No se encontró configuración de ruta {} en Redis", state.getRouteId());
@@ -82,7 +130,6 @@ public class PositionMonitoringHook {
                 return;
             }
 
-                     
             double jumpKm = (state.getLastLatitude() != null && state.getLastLongitude() != null)
                     ? HaversineCalculator.distanceKm(state.getLastLatitude(), state.getLastLongitude(), lat, lon)
                     : 0.0;
@@ -90,13 +137,13 @@ public class PositionMonitoringHook {
             boolean isAnomaly = false;
 
             if (speedKmh > MAX_BUS_SPEED_KMH) {
-                log.warn("GPS anomalía detectada (Velocidad Nativa): tripId={}, speedKmh={}", 
+                log.warn("GPS anomalía detectada (Velocidad Nativa): tripId={}, speedKmh={}",
                         state.getTripId(), String.format("%.1f", speedKmh));
                 isAnomaly = true;
             } else if (deltaHours > 0) {
                 double calculatedSpeedKmh = jumpKm / deltaHours;
                 if (calculatedSpeedKmh > (MAX_BUS_SPEED_KMH + 30.0)) {
-                    log.warn("GPS anomalía detectada (Salto Haversine): tripId={}, calcSpeed={}", 
+                    log.warn("GPS anomalía detectada (Salto Haversine): tripId={}, calcSpeed={}",
                             state.getTripId(), String.format("%.1f", calculatedSpeedKmh));
                     isAnomaly = true;
                 }
@@ -105,12 +152,12 @@ public class PositionMonitoringHook {
             if (isAnomaly) {
                 state.setLastUpdateTime(time);
                 tripStateManager.updateState(state.getTripId(), state);
-                publishTripStateUpdate(state);
+                monitoringCachePublisher.processRouteThrottled(state.getRouteId());
                 return;
             }
 
             int currentIndex = state.getCurrentPointIndex();
-            int newIndex = detectControlPointCrossing(lat, lon, controlPoints, currentIndex);
+            int newIndex = detectControlPointCrossing(lat, lon, controlPoints, currentIndex, state.getDirection());
 
             double accumulatedDistance = calculateAccumulatedDistance(
                     lat, lon, controlPoints, newIndex);
@@ -126,10 +173,12 @@ public class PositionMonitoringHook {
 
             tripStateManager.updateState(state.getTripId(), state);
 
-            publishTripStateUpdate(state);
+            monitoringCachePublisher.processRouteThrottled(state.getRouteId());
+            
+            atuTransmissionAsyncDispatcher.dispatchAsync(task.position(), state);
 
         } catch (Exception e) {
-            log.error("Error en PositionMonitoringHook para deviceId={}: {}", deviceId, e.getMessage());
+            log.error("Error en processPositionInternal para deviceId={}: {}", task.deviceId(), e.getMessage());
         }
     }
 
@@ -156,7 +205,6 @@ public class PositionMonitoringHook {
     }
 
     private Optional<TripState> findStateByDeviceContext(Long deviceId) {
-        // El RouteConfigClient puede resolver vehicleId desde deviceId via Redis
         Optional<Long> vehicleIdOpt = resolveVehicleId(deviceId);
         if (vehicleIdOpt.isEmpty()) {
             return Optional.empty();
@@ -169,15 +217,22 @@ public class PositionMonitoringHook {
     }
 
     private int detectControlPointCrossing(double lat, double lon,
-            List<ControlPointModel> controlPoints, int currentIndex) {
+            List<ControlPointModel> controlPoints, int currentIndex, String tripDirection) {
 
         int newIndex = currentIndex;
 
         for (int i = currentIndex + 1; i < controlPoints.size(); i++) {
             ControlPointModel cp = controlPoints.get(i);
+
+            if (tripDirection != null && cp.getDirection() != null 
+                    && !tripDirection.equalsIgnoreCase(cp.getDirection())
+                    && !"LOOP".equalsIgnoreCase(tripDirection)) {
+                continue;
+            }
+
             if (HaversineCalculator.isWithinRadius(lat, lon,
                     cp.getLatitude(), cp.getLongitude(), CONTROL_POINT_RADIUS_METERS)) {
-                newIndex = i;
+                return i; 
             }
         }
 
@@ -210,38 +265,4 @@ public class PositionMonitoringHook {
         return baseDistance + segmentDistance;
     }
 
-    private void publishTripStateUpdate(TripState state) {
-        try {
-            Map<String, Object> properties = new HashMap<>();
-            properties.put("tripId", state.getTripId());
-            properties.put("routeId", state.getRouteId());
-            properties.put("vehicleId", state.getVehicleId());
-            properties.put("currentPointIndex", state.getCurrentPointIndex());
-            properties.put("accumulatedDistanceKm", state.getAccumulatedDistanceKm());
-            properties.put("accumulatedDelayMinutes", state.getAccumulatedDelayMinutes());
-            properties.put("status", state.getStatus());
-            properties.put("direction", state.getDirection());
-            if (state.getLastLatitude() != null) {
-                properties.put("latitude", state.getLastLatitude());
-            }
-            if (state.getLastLongitude() != null) {
-                properties.put("longitude", state.getLastLongitude());
-            }
-            if (state.getLastSpeedKmh() != null) {
-                properties.put("speedKmh", state.getLastSpeedKmh());
-            }
-
-            WebsocketMessage message = WebsocketMessage.builder()
-                    .broadcast(true)
-                    .messageAgregateType(WebsocketMessage.MessageAgregateType.TRIP_STATE_UPDATE)
-                    .messageType(WebsocketMessage.MessageType.REFRESH)
-                    .companyId(state.getCompanyId())
-                    .properties(properties)
-                    .build();
-
-            kafkaPublisherService.publishWebsocketMessage(message);
-        } catch (Exception e) {
-            log.warn("Error publicando TripState update por WebSocket: {}", e.getMessage());
-        }
-    }
 }

@@ -5,6 +5,7 @@ import com.ingestion.pe.mscore.domain.atu.core.model.AtuPayload;
 import com.ingestion.pe.mscore.domain.atu.core.model.AtuResponse;
 import com.ingestion.pe.mscore.domain.atu.app.port.AtuWebSocketPort;
 import java.net.URI;
+import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -26,21 +27,29 @@ public class AtuWebSocketClientAdapter implements AtuWebSocketPort {
     private final ObjectMapper objectMapper;
     
     private final ConcurrentHashMap<String, WebSocketSession> sessionsByToken = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Instant> nextRetryByToken = new ConcurrentHashMap<>();
 
     private final StandardWebSocketClient webSocketClient = new StandardWebSocketClient();
 
     @Override
-    public void sendPayload(String token, String endpoint, AtuPayload payload) {
+    public boolean sendPayload(String token, String endpoint, AtuPayload payload) {
         try {
+            String jsonPayload = objectMapper.writeValueAsString(payload);
+            log.info("[ATU JSON] {}", jsonPayload);
+
             WebSocketSession session = getOrConnectSession(token, endpoint);
             
-            String jsonPayload = objectMapper.writeValueAsString(payload);
             session.sendMessage(new TextMessage(jsonPayload));
             
+            log.info("enviocorrectamenteatu");
             log.info("[ATU] Trama WS enviada correctamente para IMEI={} a {}", payload.getImei(), endpoint);
+            return true;
         } catch (Exception e) {
+            log.error("enviofallidoatu");
             log.error("Error enviando trama WS ATU para IMEI={}: {}", payload.getImei(), e.getMessage());
+            
             sessionsByToken.remove(token);
+            return false;
         }
     }
 
@@ -52,22 +61,41 @@ public class AtuWebSocketClientAdapter implements AtuWebSocketPort {
             return existingSession;
         }
 
+        Instant nextRetry = nextRetryByToken.get(token);
+        if (nextRetry != null && Instant.now().isBefore(nextRetry)) {
+            throw new RuntimeException("ATU Connection Cooldown: Esperando hasta " + nextRetry + " para reintentar conexión.");
+        }
+
         if (existingSession != null) {
             sessionsByToken.remove(token);
         }
 
         String wsUrl = endpoint;
-        if (!wsUrl.contains("?token=")) {
-            wsUrl += "?token=" + token;
+        if (wsUrl.contains("token=")) {
+            if (wsUrl.endsWith("token=")) {
+                wsUrl += token;
+            }
+        } else {
+            wsUrl += (wsUrl.contains("?") ? "&" : "?") + "token=" + token;
         }
 
         log.info("Conectando al WebSocket ATU: {}", wsUrl);
 
-        WebSocketSession newSession = webSocketClient.execute(new AtuWebSocketHandler(token), wsUrl)
-                .get(10, TimeUnit.SECONDS);
-                
-        sessionsByToken.put(token, newSession);
-        return newSession;
+        try {
+            WebSocketSession newSession = webSocketClient.execute(new AtuWebSocketHandler(token), wsUrl)
+                    .get(10, TimeUnit.SECONDS);
+            
+            nextRetryByToken.remove(token);
+            sessionsByToken.put(token, newSession);
+            
+            Thread.sleep(300);
+            
+            return newSession;
+        } catch (Exception e) {
+            nextRetryByToken.put(token, Instant.now().plusSeconds(30));
+            log.error("Fallo al establecer conexión con ATU. Cooldown activado (30s). Error: {}", e.getMessage());
+            throw e;
+        }
     }
 
     private String truncateToken(String token) {
@@ -95,11 +123,16 @@ public class AtuWebSocketClientAdapter implements AtuWebSocketPort {
                 log.debug("Respuesta WS ATU cruda: {}", payload);
                 
                 AtuResponse response = objectMapper.readValue(payload, AtuResponse.class);
+                if (response == null) {
+                    log.error("[ATU] Error crítico: El mapeo de la respuesta ATU retornó null.");
+                    return;
+                }
+
                 if (response.isSuccess()) {
                     log.info("[ATU] Trama procesada correctamente por servidor ATU (Identificador={})", response.getIdentifier());
                 } else {
-                    log.warn("[ATU] Servidor rechazó la trama. Código: {} - {}. Identifier: {}", 
-                            response.getCode(), response.getMessage(), response.getIdentifier());
+                    log.warn("[ATU] Servidor rechazó la trama. Código: {} - {}. Identifier: {} - Respuesta completa: {}", 
+                            response.getCode(), response.getMessage(), response.getIdentifier(), payload);
                 }
             } catch (Exception e) {
                 log.error("Error parseando respuesta WS de la ATU: {}", e.getMessage());

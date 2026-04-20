@@ -50,7 +50,7 @@ public class RouteConfigClient {
                 .or(() -> {
                     log.debug("No se encontró Trip {} activo en DB. Guardando marcador negativo.", tripId);
                     TripActiveResponse negative = TripActiveResponse.builder().id(-1L).build();
-                    tripActiveCacheDao.save("trip:active:" + tripId, negative, 3600);
+                    tripActiveCacheDao.save("trip:active:" + tripId, negative, 5);
                     return Optional.empty();
                 });
     }
@@ -77,7 +77,7 @@ public class RouteConfigClient {
             tripIdsCacheDao.save("trip:active:vehicle:" + vehicleId, new Long[] { tId }, 3600);
             return Optional.of(tId);
         } else {
-            tripIdsCacheDao.save("trip:active:vehicle:" + vehicleId, new Long[] { -1L }, 3600);
+            tripIdsCacheDao.save("trip:active:vehicle:" + vehicleId, new Long[] { -1L }, 5);
             return Optional.empty();
         }
     }
@@ -106,7 +106,7 @@ public class RouteConfigClient {
                 .map(com.ingestion.pe.mscore.domain.dispatch.core.entity.TripReadEntity::getId)
                 .toList();
         
-        tripIdsCacheDao.save("trip:active:route:" + routeId, ids.isEmpty() ? new Long[]{-1L} : ids.toArray(new Long[0]), 3600);
+        tripIdsCacheDao.save("trip:active:route:" + routeId, ids.isEmpty() ? new Long[]{-1L} : ids.toArray(new Long[0]), ids.isEmpty() ? 5 : 3600);
         
         return ids;
     }
@@ -156,7 +156,7 @@ public class RouteConfigClient {
                 .or(() -> {
                     log.debug("No se encontró vehículo para DeviceID={} en DB. Guardando marcador negativo.", deviceId);
                     VehicleResponse negative = VehicleResponse.builder().id(-1L).build();
-                    vehicleCacheDao.save("vehicle:deviceId:" + deviceId, negative, 3600);
+                    vehicleCacheDao.save("vehicle:deviceId:" + deviceId, negative, 5);
                     return Optional.empty();
                 });
     }
