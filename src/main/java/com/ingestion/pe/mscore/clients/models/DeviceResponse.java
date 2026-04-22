@@ -27,4 +27,6 @@ public class DeviceResponse {
     private Double altitude;
     private Double speedInKmh;
     private List<Map<String, Object>> sensorData;
+    private String deviceStatus;
+    private String status;
 }

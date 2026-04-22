@@ -13,7 +13,8 @@ import com.ingestion.pe.mscore.domain.devices.core.entity.DeviceEntity;
 import com.ingestion.pe.mscore.domain.devices.core.entity.HistoricalDeviceEntity;
 import com.ingestion.pe.mscore.domain.devices.core.models.SensorModel;
 import com.ingestion.pe.mscore.domain.devices.core.repo.DeviceEntityRepository;
-
+import com.ingestion.pe.mscore.commons.models.enums.EntityStatus;
+import com.ingestion.pe.mscore.domain.devices.core.enums.DeviceStatus;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -104,6 +105,13 @@ public class DeviceServiceHandler {
         entity.setSensor(response.getSensor());
         entity.setSensorRaw(response.getSensorRaw());
         entity.setDataHistory(response.getDataHistory());
+
+        if (response.getDeviceStatus() != null) {
+            entity.setDeviceStatus(DeviceStatus.valueOf(response.getDeviceStatus()));
+        }
+        if (response.getStatus() != null) {
+            entity.setStatus(EntityStatus.valueOf(response.getStatus()));
+        }
         
         if (response.getSensorData() != null) {
             Set<SensorModel> sensors = response.getSensorData().stream()
