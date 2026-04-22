@@ -67,7 +67,8 @@ public class DeviceServiceHandler {
                     position.getSpeedInKm(),
                     position.getDeviceTime() != null ? position.getDeviceTime().toInstant() : Instant.now(),
                     position,
-                    companyId);
+                    companyId,
+                    device);
 
 
             log.info("[DEBUG] Dispositivo procesado en Fast-Lane. IMEI: {}", device.getImei());

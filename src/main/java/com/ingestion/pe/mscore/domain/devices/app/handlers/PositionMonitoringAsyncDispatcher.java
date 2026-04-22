@@ -2,7 +2,9 @@ package com.ingestion.pe.mscore.domain.devices.app.handlers;
 
 import com.ingestion.pe.mscore.applications.tracking.TrackingProcessorService;
 import com.ingestion.pe.mscore.commons.models.Position;
+import com.ingestion.pe.mscore.domain.devices.core.entity.DeviceEntity;
 import com.ingestion.pe.mscore.domain.monitoring.app.handler.PositionMonitoringHook;
+import com.ingestion.pe.mscore.domain.vehicles.app.manager.VehicleTrackingPublishService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -17,12 +19,13 @@ public class PositionMonitoringAsyncDispatcher {
 
     private final PositionMonitoringHook positionMonitoringHook;
     private final TrackingProcessorService trackingProcessorService;
+    private final VehicleTrackingPublishService vehicleTrackingPublishService;
 
     /**
      * Procesa asíncronamente las tareas de monitoreo y geocercas.
      */
     @Async("taskExecutor")
-    public void dispatchAsync(Long deviceId, double lat, double lon, double speedKmh, Instant time, Position position, Long companyId) {
+    public void dispatchAsync(Long deviceId, double lat, double lon, double speedKmh, Instant time, Position position, Long companyId, DeviceEntity device) {
         // Ejecución de Monitoreo (Hook de rutas)
         try {
             positionMonitoringHook.onPositionReceived(deviceId, lat, lon, speedKmh, time, position, companyId);
@@ -35,6 +38,13 @@ public class PositionMonitoringAsyncDispatcher {
             trackingProcessorService.processPositionForTracking(position, companyId);
         } catch (Exception e) {
             log.error("Error async en TrackingProcessorService para deviceId={}: {}", deviceId, e.getMessage());
+        }
+
+        // Actualización de tabla vehicle
+        try {
+            vehicleTrackingPublishService.processPositionForVehicle(position, device);
+        } catch (Exception e) {
+            log.error("Error async en VehicleTrackingPublishService para deviceId={}: {}", deviceId, e.getMessage());
         }
     }
 }
