@@ -325,7 +325,10 @@ public class DeviceEntity {
         this.deviceStatus = DeviceStatus.online;
         this.lastConnection = Instant.now();
     }
-
+    public void updateNewUnknown() {
+        this.deviceStatus = DeviceStatus.unknown;
+        this.updated = Instant.now();
+    }
     public void updateNewDisconnection() {
         this.deviceStatus = DeviceStatus.offline;
         this.lastDisconnection = Instant.now();
