@@ -1,16 +1,17 @@
 package com.ingestion.pe.mscore.domain.vehicles.app.manager;
 
+import com.ingestion.pe.mscore.applications.tracking.DistanceCalculator;
 import com.ingestion.pe.mscore.bridge.pub.service.KafkaPublisherService;
+import com.ingestion.pe.mscore.clients.cache.store.DeviceCacheStore;
 import com.ingestion.pe.mscore.commons.models.Position;
+import com.ingestion.pe.mscore.domain.devices.app.handlers.models.StatusDevice;
 import com.ingestion.pe.mscore.domain.devices.core.entity.DeviceEntity;
-import com.ingestion.pe.mscore.domain.devices.core.enums.DeviceStatus;
 import com.ingestion.pe.mscore.domain.vehicles.app.factory.VehicleWebsocketMessageFactory;
 import com.ingestion.pe.mscore.domain.vehicles.core.dto.response.VehicleStatusSummary;
 import com.ingestion.pe.mscore.domain.vehicles.core.entity.VehicleTrackingEntity;
 import com.ingestion.pe.mscore.domain.vehicles.core.enums.IgnitionStatus;
 import com.ingestion.pe.mscore.domain.vehicles.core.enums.VehicleStatus;
 import com.ingestion.pe.mscore.domain.vehicles.core.models.SnapshotManager;
-import com.ingestion.pe.mscore.applications.tracking.DistanceCalculator;
 import com.ingestion.pe.mscore.domain.vehicles.core.repo.VehicleTrackingEntityRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,16 +20,16 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class VehicleTrackingPublishService {
+public class VehicleServiceHandler {
 
     private final VehicleTrackingEntityRepository vehicleTrackingEntityRepository;
     private final KafkaPublisherService kafkaPublisherService;
     private final DistanceCalculator distanceCalculator;
+    private final DeviceCacheStore deviceCacheStore;
 
     public void processPositionForVehicle(Position position, DeviceEntity device) {
         log.debug("Procesando actualización de vehículo para deviceId: {}", device.getId());
@@ -87,17 +88,21 @@ public class VehicleTrackingPublishService {
         }
     }
 
-    public void processStatusForVehicle(DeviceEntity device, boolean isOnline) {
-        log.debug("Procesando actualización de ESTADO de vehículo para deviceId: {}", device.getId());
-        
-        List<VehicleTrackingEntity> vehicles = vehicleTrackingEntityRepository.findAllByDeviceId(device.getId());
+    public void processStatusForVehicle(StatusDevice statusDevice) {
+        log.debug("Procesando actualización de ESTADO de vehículo para deviceId: {}", statusDevice.getDeviceId());
+
+        List<VehicleTrackingEntity> vehicles = vehicleTrackingEntityRepository.findAllByDeviceId(statusDevice.getDeviceId());
         
         if (vehicles.isEmpty()) {
-            log.debug("No se encontró vehículo para cambiar de estado (deviceId: {})", device.getId());
+            log.debug("No se encontró vehículo para cambiar de estado (deviceId: {})", statusDevice.getDeviceId());
             return;
         }
 
-        VehicleStatus newStatus = isOnline ? VehicleStatus.online : VehicleStatus.offline;
+        VehicleStatus newStatus = switch (statusDevice.getStatus()) {
+            case online -> VehicleStatus.online;
+            case offline -> VehicleStatus.offline;
+            default -> VehicleStatus.unknown;
+        };
 
         for (VehicleTrackingEntity vehicle : vehicles) {
             vehicle.setStatus(newStatus);

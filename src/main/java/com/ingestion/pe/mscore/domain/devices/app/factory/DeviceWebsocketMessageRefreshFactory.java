@@ -4,98 +4,100 @@ import com.ingestion.pe.mscore.commons.models.WebsocketMessage;
 import com.ingestion.pe.mscore.domain.devices.core.dto.response.DevicesStatusSummary;
 import com.ingestion.pe.mscore.domain.devices.core.entity.DeviceEntity;
 import com.ingestion.pe.mscore.domain.devices.core.entity.HistoricalDeviceEntity;
+
 import java.time.Instant;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public final class DeviceWebsocketMessageRefreshFactory {
 
-        private DeviceWebsocketMessageRefreshFactory() {
-        }
+  private DeviceWebsocketMessageRefreshFactory() {
+  }
 
-        public static WebsocketMessage newDeviceStatus(DeviceEntity device) {
-                return refresh(
-                                "STATUS_DEVICE",
-                                "Nuevo status para el dispositivo " + device.getImei(),
-                                Map.of(
-                                                "deviceId",
-                                                device.getId(),
-                                                "status",
-                                                device.getDeviceStatus().name(),
-                                                "updateAt",
-                                                Instant.now().toString()),
-                                device.getCompany());
-        }
+  public static WebsocketMessage newDeviceStatus(DeviceEntity device) {
+    return refresh(
+      "STATUS_DEVICE",
+      "Nuevo status para el dispositivo " + device.getImei(),
+      Map.of(
+        "deviceId",
+        device.getId(),
+        "status",
+        device.getDeviceStatus().name(),
+        "updateAt",
+        Instant.now().toString()),
+      device.getCompany());
+  }
 
-        public static WebsocketMessage newDeviceUpdate(
-                        Long companyId, DeviceEntity device, HistoricalDeviceEntity historicalSave, String traceUuid) {
-                Map<String, Object> attributes = new HashMap<>();
-                attributes.put("deviceId", device.getId());
-                attributes.put("imei", device.getImei());
-                attributes.put("traceUuid", traceUuid);
-                attributes.put("historicalId", historicalSave != null ? historicalSave.getId() : null);
-                attributes.put("status", device.getDeviceStatus() != null ? device.getDeviceStatus().name() : null);
-                attributes.put("sensor", device.getSensor());
-                
-                if (historicalSave != null) {
-                    attributes.put("latitude", historicalSave.getLatitude());
-                    attributes.put("longitude", historicalSave.getLongitude());
-                    attributes.put("speedInKm", historicalSave.getSpeedInKm());
-                    attributes.put("course", historicalSave.getCourse());
-                    attributes.put("address", historicalSave.getAddress());
-                    attributes.put("severTime", historicalSave.getServerTime().toString());
-                    attributes.put("deviceTime", historicalSave.getDeviceTime().toString());
-                    attributes.put("fixTime", historicalSave.getFixTime().toString());
-                } else {
-                    attributes.put("latitude", device.getLatitude());
-                    attributes.put("longitude", device.getLongitude());
-                    attributes.put("speedInKm", device.getSpeedInKmh());
-                    attributes.put("course", device.getCourse());
-                    attributes.put("deviceTime", device.getDeviceTime() != null ? device.getDeviceTime().toString() : Instant.now().toString());
-                }
-                
-                attributes.put("sensorsRaw", device.getSensorRaw());
-                attributes.put("sensorData", device.getSensorsData());
-                attributes.put("updateAt", Instant.now().toString());
-                return refresh(
-                                "DEVICE_UPDATE",
-                                "Nueva posición registrada",
-                                attributes,
-                                companyId);
-        }
+  public static WebsocketMessage newDeviceUpdate(
+    Long companyId, DeviceEntity device, HistoricalDeviceEntity historicalSave, String traceUuid) {
+    Map<String, Object> attributes = new HashMap<>();
+    attributes.put("deviceId", device.getId());
+    attributes.put("imei", device.getImei());
+    attributes.put("traceUuid", traceUuid);
+    attributes.put("historicalId", historicalSave != null ? historicalSave.getId() : null);
+    attributes.put("status", device.getDeviceStatus() != null ? device.getDeviceStatus().name() : null);
+    attributes.put("sensor", device.getSensor());
 
-        public static WebsocketMessage newSummaryDevice(
-                        Long companyId, List<DevicesStatusSummary> summaryStatusSystems) {
-                Map<String, Object> attributes = new HashMap<>();
-                attributes.put(
-                                "totalDevices",
-                                summaryStatusSystems.stream().mapToLong(DevicesStatusSummary::getCountDevices).sum());
-                attributes.put("online", 0L);
-                attributes.put("offline", 0L);
-                attributes.put("unknown", 0L);
-                attributes.put("updateAt", Instant.now().toString());
-                summaryStatusSystems.forEach(
-                                deviceSummary -> attributes.put(deviceSummary.getStatus().name(),
-                                                deviceSummary.getCountDevices()));
-                return refresh(
-                                "SUMMARY_DEVICE",
-                                "Resumen de dispositivos actualizado",
-                                attributes,
-                                companyId);
-        }
+    if (historicalSave != null) {
+      attributes.put("latitude", historicalSave.getLatitude());
+      attributes.put("longitude", historicalSave.getLongitude());
+      attributes.put("speedInKm", historicalSave.getSpeedInKm());
+      attributes.put("course", historicalSave.getCourse());
+      attributes.put("address", historicalSave.getAddress());
+      attributes.put("severTime", historicalSave.getServerTime().toString());
+      attributes.put("deviceTime", historicalSave.getDeviceTime().toString());
+      attributes.put("fixTime", historicalSave.getFixTime().toString());
+    } else {
+      attributes.put("latitude", device.getLatitude());
+      attributes.put("longitude", device.getLongitude());
+      attributes.put("speedInKm", device.getSpeedInKmh());
+      attributes.put("course", device.getCourse());
+      attributes.put("deviceTime", device.getDeviceTime() != null ? device.getDeviceTime().toString() : Instant.now().toString());
+    }
+
+    attributes.put("sensorsRaw", device.getSensorRaw());
+    attributes.put("sensorData", device.getSensorsData());
+    attributes.put("updateAt", Instant.now().toString());
+    return refresh(
+      "DEVICE_UPDATE",
+      "Nueva posición registrada",
+      attributes,
+      companyId);
+  }
+
+  public static WebsocketMessage newSummaryDevice(
+    Long companyId, List<DevicesStatusSummary> summaryStatusSystems) {
+    Map<String, Object> attributes = new HashMap<>();
+    attributes.put(
+      "totalDevices",
+      summaryStatusSystems.stream().mapToLong(DevicesStatusSummary::getCountDevices).sum());
+    attributes.put("online", 0L);
+    attributes.put("offline", 0L);
+    attributes.put("unknown", 0L);
+    attributes.put("updateAt", Instant.now().toString());
+    summaryStatusSystems.forEach(
+      deviceSummary -> attributes.put(deviceSummary.getStatus().name(),
+        deviceSummary.getCountDevices()));
+    return refresh(
+      "SUMMARY_DEVICE",
+      "Resumen de dispositivos actualizado",
+      attributes,
+      companyId);
+  }
 
 
+  private static WebsocketMessage refresh(
+    String type,
+    String message,
+    Map<String, Object> properties,
+    Long companyId) {
 
-        private static WebsocketMessage refresh(
-                        String type,
-                        String message,
-                        Map<String, Object> properties,
-                        Long companyId) {
-
-                return WebsocketMessage.refreshBuilder()
-                                .message(message)
-                                .properties(properties)
-                                .companyId(companyId)
-                                .messageAgregateType(WebsocketMessage.MessageAgregateType.valueOf(type))
-                                .build();
-        }
+    return WebsocketMessage.refreshBuilder()
+      .message(message)
+      .properties(properties)
+      .companyId(companyId)
+      .messageAgregateType(WebsocketMessage.MessageAgregateType.valueOf(type))
+      .build();
+  }
 }

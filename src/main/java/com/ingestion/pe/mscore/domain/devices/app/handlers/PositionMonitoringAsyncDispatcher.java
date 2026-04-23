@@ -4,7 +4,7 @@ import com.ingestion.pe.mscore.applications.tracking.TrackingProcessorService;
 import com.ingestion.pe.mscore.commons.models.Position;
 import com.ingestion.pe.mscore.domain.devices.core.entity.DeviceEntity;
 import com.ingestion.pe.mscore.domain.monitoring.app.handler.PositionMonitoringHook;
-import com.ingestion.pe.mscore.domain.vehicles.app.manager.VehicleTrackingPublishService;
+import com.ingestion.pe.mscore.domain.vehicles.app.manager.VehicleServiceHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -19,7 +19,7 @@ public class PositionMonitoringAsyncDispatcher {
 
     private final PositionMonitoringHook positionMonitoringHook;
     private final TrackingProcessorService trackingProcessorService;
-    private final VehicleTrackingPublishService vehicleTrackingPublishService;
+    private final VehicleServiceHandler vehicleServiceHandler;
 
     /**
      * Procesa asíncronamente las tareas de monitoreo y geocercas.
@@ -42,9 +42,9 @@ public class PositionMonitoringAsyncDispatcher {
 
         // Actualización de tabla vehicle
         try {
-            vehicleTrackingPublishService.processPositionForVehicle(position, device);
+            vehicleServiceHandler.processPositionForVehicle(position, device);
         } catch (Exception e) {
-            log.error("Error async en VehicleTrackingPublishService para deviceId={}: {}", deviceId, e.getMessage());
+            log.error("Error async en VehicleServiceHandler para deviceId={}: {}", deviceId, e.getMessage());
         }
     }
 }
