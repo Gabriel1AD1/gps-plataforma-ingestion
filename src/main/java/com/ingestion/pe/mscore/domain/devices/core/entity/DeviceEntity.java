@@ -324,6 +324,7 @@ public class DeviceEntity {
     public void updateNewConnection() {
         this.deviceStatus = DeviceStatus.online;
         this.lastConnection = Instant.now();
+        this.updated = Instant.now();
     }
     public void updateNewUnknown() {
         this.deviceStatus = DeviceStatus.unknown;
@@ -332,11 +333,13 @@ public class DeviceEntity {
     public void updateNewDisconnection() {
         this.deviceStatus = DeviceStatus.offline;
         this.lastDisconnection = Instant.now();
+        this.updated = Instant.now();
     }
 
     public void updateLastDataReceived() {
         this.deviceStatus = DeviceStatus.online;
         this.lastDataReceived = Instant.now();
+        this.updated = Instant.now();
     }
 
     /**
