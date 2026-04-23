@@ -69,6 +69,8 @@ public class DeviceCacheStore {
                 entity.getLongitude(),
                 entity.getAltitude(),
                 entity.getSpeedInKmh(),
-                entity.getSensorDataMap());
+                entity.getSensorDataMap(),
+                entity.getDeviceStatus() != null ? entity.getDeviceStatus().name() : null,
+                entity.getStatus() != null ? entity.getStatus().name() : null);
     }
 }

@@ -33,7 +33,7 @@ public final class DeviceWebsocketMessageRefreshFactory {
                 attributes.put("imei", device.getImei());
                 attributes.put("traceUuid", traceUuid);
                 attributes.put("historicalId", historicalSave != null ? historicalSave.getId() : null);
-                attributes.put("status", device.getStatus());
+                attributes.put("status", device.getDeviceStatus() != null ? device.getDeviceStatus().name() : null);
                 attributes.put("sensor", device.getSensor());
                 
                 if (historicalSave != null) {
