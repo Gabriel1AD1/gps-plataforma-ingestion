@@ -4,16 +4,17 @@ import com.ingestion.pe.mscore.bridge.pub.models.enums.ApplicationName;
 import com.ingestion.pe.mscore.bridge.pub.models.enums.ModuleName;
 import com.ingestion.pe.mscore.commons.libs.utils.JsonUtils;
 import com.ingestion.pe.mscore.commons.models.enums.EventTypeEnumerated;
-import com.ingestion.pe.mscore.commons.models.enums.SeverityStatus;
 import com.ingestion.pe.mscore.commons.models.enums.NotificationTypes;
-import java.time.Instant;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import com.ingestion.pe.mscore.commons.models.enums.SeverityStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 @Data
 @Builder

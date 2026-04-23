@@ -17,15 +17,16 @@ import com.ingestion.pe.mscore.domain.geofences.core.entity.GeofenceReadEntity;
 import com.ingestion.pe.mscore.domain.geofences.core.repo.GeofenceReadEntityRepository;
 import com.ingestion.pe.mscore.domain.vehicles.core.entity.VehicleGeofenceEntity;
 import com.ingestion.pe.mscore.domain.vehicles.core.repo.VehicleGeofenceEntityRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor

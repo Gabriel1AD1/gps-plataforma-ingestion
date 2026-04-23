@@ -9,7 +9,7 @@ import com.ingestion.pe.mscore.domain.devices.app.handlers.models.StatusDevice;
 import com.ingestion.pe.mscore.domain.devices.core.dto.response.DevicesStatusSummary;
 import com.ingestion.pe.mscore.domain.devices.core.entity.DeviceEntity;
 import com.ingestion.pe.mscore.domain.devices.core.repo.DeviceEntityRepository;
-import com.ingestion.pe.mscore.domain.vehicles.app.manager.VehicleTrackingPublishService;
+import com.ingestion.pe.mscore.domain.vehicles.app.manager.VehicleServiceHandler;
 
 import java.util.List;
 
@@ -24,7 +24,7 @@ public class StatusDeviceServiceHandler {
   private static final Logger log = LoggerFactory.getLogger(StatusDeviceServiceHandler.class);
   private final DeviceEntityRepository deviceEntityRepository;
   private final KafkaPublisherService kafkaPublisherService;
-  private final VehicleTrackingPublishService vehicleTrackingPublishService;
+  private final VehicleServiceHandler vehicleServiceHandler;
 
   public void handleStatusDeviceService(StatusDevice message) {
     try {
@@ -45,8 +45,6 @@ public class StatusDeviceServiceHandler {
             kafkaPublisherService.publishWebsocketMessage(statusMessage);
             WebsocketMessage summaryMessage = sendNewSummary(device.getCompany());
             kafkaPublisherService.publishWebsocketMessage(summaryMessage);
-
-            vehicleTrackingPublishService.processStatusForVehicle(device, message.getStatus().name().equalsIgnoreCase("online"));
           });
       }
     } catch (Exception e) {
