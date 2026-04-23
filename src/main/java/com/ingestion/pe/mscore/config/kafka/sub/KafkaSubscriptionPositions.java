@@ -12,30 +12,30 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class KafkaSubscriptionPositions {
-    private static final Logger log = LoggerFactory.getLogger(KafkaSubscriptionPositions.class);
+  private static final Logger log = LoggerFactory.getLogger(KafkaSubscriptionPositions.class);
 
-    private final DeviceServiceHandler deviceServiceHandler;
+  private final DeviceServiceHandler deviceServiceHandler;
 
-    @KafkaListener(topics = "${kafka.topic.position}", groupId = "${kafka.group.id}", containerFactory = "kafkaListenerContainerFactory")
-    public void listen(String positionObj) {
-        try {
-            log.info("Position received: {}", positionObj);
+  @KafkaListener(topics = "${kafka.topic.position}", groupId = "${kafka.group.id}", containerFactory = "kafkaListenerContainerFactory")
+  public void listen(String positionObj) {
+    try {
+      log.info("Position received: {}", positionObj);
 
-            Position position = Position.fromJson(positionObj);
-            log.debug("Posición parseada: {}", position);
-            log.info("🔍 [DEBUG] RAW Parsing IMEI: '{}'", position.getImei()); // Log exacto del IMEI parseado
-            LogManager.addCorrelationId(position.getCorrelationId());
-            log.debug("Agregado CorrelationId al LogManager: {}", position.getCorrelationId());
-            try {
-                deviceServiceHandler.handleDeviceEvent(position);
-            } catch (Exception e) {
-                log.error("Error en el procesamiento del dispositivo para la posición: {}", e.getMessage(), e);
-            }
+      Position position = Position.fromJson(positionObj);
+      log.debug("Posición parseada: {}", position);
+      log.info("🔍 [DEBUG] RAW Parsing IMEI: '{}'", position.getImei()); // Log exacto del IMEI parseado
+      LogManager.addCorrelationId(position.getCorrelationId());
+      log.debug("Agregado CorrelationId al LogManager: {}", position.getCorrelationId());
+      try {
+        deviceServiceHandler.handleDeviceEvent(position);
+      } catch (Exception e) {
+        log.error("Error en el procesamiento del dispositivo para la posición: {}", e.getMessage(), e);
+      }
 
-            log.debug("Position processed (core + tracking): IMEI={}", position.getImei());
+      log.debug("Position processed (core + tracking): IMEI={}", position.getImei());
 
-        } catch (Exception e) {
-            log.error("Error processing position: {}", e.getMessage(), e);
-        }
+    } catch (Exception e) {
+      log.error("Error processing position: {}", e.getMessage(), e);
     }
+  }
 }
